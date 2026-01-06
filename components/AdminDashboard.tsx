@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PublicData, PrivateData, LinkCard, Category } from '../types';
 import { webdav } from '../services/webdavService';
-import { Button, Input, Modal, Card } from './UI';
+import { Button, Input, Select, Modal, Card } from './UI';
 import { Settings, Layout, Layers, LogOut, Plus, Trash2, Edit2, GripVertical, Save, Shield } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -23,7 +23,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   const [localPrivate, setLocalPrivate] = useState<PrivateData>(privateData);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Sync prop updates to local state
   useEffect(() => {
     setLocalPublic(publicData);
   }, [publicData]);
@@ -38,7 +37,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
       setHasChanges(false);
       alert('保存成功！');
     } catch (error) {
-      alert('保存失败。');
+      console.error(error);
+      alert('保存失败，请检查网络或配置。');
     } finally {
       setIsSaving(false);
     }
@@ -48,22 +48,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row dark:bg-slate-950">
-      {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col h-auto md:h-screen sticky top-0 dark:bg-black dark:border-r dark:border-slate-800">
+      {/* Sidebar - Fixed width on desktop, flexible on mobile */}
+      <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col md:h-screen md:sticky md:top-0 z-10 dark:bg-black dark:border-r dark:border-slate-800">
         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
           <div className="w-8 h-8 rounded bg-indigo-500 flex items-center justify-center text-white font-bold">
             <Shield size={18} />
           </div>
           <span className="font-semibold text-white">管理后台</span>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <NavButton active={activeTab === 'cards'} onClick={() => setActiveTab('cards')} icon={<Layout size={18} />} label="卡片管理" />
           <NavButton active={activeTab === 'categories'} onClick={() => setActiveTab('categories')} icon={<Layers size={18} />} label="分类管理" />
           <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={18} />} label="网站设置" />
         </nav>
         <div className="p-4 border-t border-slate-800">
            {hasChanges && (
-            <div className="mb-4 p-3 bg-indigo-900/50 rounded-lg border border-indigo-500/30 text-xs text-indigo-200 text-center">
+            <div className="mb-4 p-3 bg-indigo-900/50 rounded-lg border border-indigo-500/30 text-xs text-indigo-200 text-center animate-pulse">
               您有未保存的更改
             </div>
           )}
@@ -73,9 +73,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-        <header className="flex justify-between items-center mb-8">
+      {/* Main Content - Flex-1 and min-w-0 are crucial for responsive grid inside flex container */}
+      <main className="flex-1 flex flex-col h-[calc(100vh-theme(spacing.16))] md:h-screen overflow-hidden min-w-0">
+        <header className="flex-shrink-0 flex justify-between items-center p-4 md:p-8 bg-slate-100 dark:bg-slate-950 z-10">
           <div>
             <h2 className="text-2xl font-bold text-slate-900 capitalize dark:text-slate-100">
               {activeTab === 'cards' && '卡片管理'}
@@ -89,27 +89,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           </Button>
         </header>
 
-        <div className="max-w-4xl">
-          {activeTab === 'settings' && (
-            <SettingsTab 
-              publicData={localPublic} 
-              privateData={localPrivate}
-              onChangePublic={(d) => { setLocalPublic(d); markChanged(); }}
-              onChangePrivate={(d) => { setLocalPrivate(d); markChanged(); }}
-            />
-          )}
-          {activeTab === 'cards' && (
-            <CardsTab 
-              data={localPublic} 
-              onChange={(d) => { setLocalPublic(d); markChanged(); }} 
-            />
-          )}
-          {activeTab === 'categories' && (
-            <CategoriesTab 
-              data={localPublic} 
-              onChange={(d) => { setLocalPublic(d); markChanged(); }} 
-            />
-          )}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-0">
+           <div className="max-w-5xl mx-auto pb-20">
+              {activeTab === 'settings' && (
+                <SettingsTab 
+                  publicData={localPublic} 
+                  privateData={localPrivate}
+                  onChangePublic={(d) => { setLocalPublic(d); markChanged(); }}
+                  onChangePrivate={(d) => { setLocalPrivate(d); markChanged(); }}
+                />
+              )}
+              {activeTab === 'cards' && (
+                <CardsTab 
+                  data={localPublic} 
+                  onChange={(d) => { setLocalPublic(d); markChanged(); }} 
+                />
+              )}
+              {activeTab === 'categories' && (
+                <CategoriesTab 
+                  data={localPublic} 
+                  onChange={(d) => { setLocalPublic(d); markChanged(); }} 
+                />
+              )}
+           </div>
         </div>
       </main>
     </div>
@@ -290,27 +292,29 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void }
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <select 
-          className="p-2 border rounded-lg bg-white text-sm min-w-[150px] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200"
+        <Select 
           value={filterCat}
           onChange={(e) => setFilterCat(e.target.value)}
+          className="min-w-[150px]"
         >
           <option value="all">所有分类</option>
           {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        </Select>
         <Button onClick={openNew}><Plus size={16} className="mr-1"/> 新建卡片</Button>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {filteredCards.map(card => (
           <div key={card.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex items-center gap-4 hover:border-indigo-200 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:hover:border-indigo-500/50">
-            <img src={card.icon} className="w-10 h-10 rounded bg-slate-50 object-cover dark:bg-slate-700" alt="" />
+            <div className="w-10 h-10 shrink-0">
+               <img src={card.icon} className="w-10 h-10 rounded bg-slate-50 object-cover dark:bg-slate-700" alt="" onError={(e) => {(e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}} />
+            </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-slate-800 truncate dark:text-slate-100">{card.title}</h4>
               <p className="text-xs text-slate-500 truncate dark:text-slate-400">{card.url}</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 hidden sm:inline-block dark:bg-slate-900 dark:text-slate-400">
+              <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 hidden sm:inline-block dark:bg-slate-900 dark:text-slate-400 max-w-[80px] truncate">
                 {data.categories.find(c => c.id === card.categoryId)?.name || '未知分类'}
               </span>
               <button onClick={() => openEdit(card)} className="p-2 hover:bg-slate-100 rounded text-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"><Edit2 size={16}/></button>
@@ -318,7 +322,7 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void }
             </div>
           </div>
         ))}
-        {filteredCards.length === 0 && <p className="text-center text-slate-400 py-8">该分类下没有卡片。</p>}
+        {filteredCards.length === 0 && <p className="text-center text-slate-400 py-8 col-span-full">该分类下没有卡片。</p>}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCard.id ? "编辑卡片" : "新建卡片"}>
@@ -339,16 +343,13 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void }
               value={editingCard.icon || ''} 
               onChange={e => setEditingCard({...editingCard, icon: e.target.value})} 
             />
-            <div className="w-full">
-              <label className="mb-1.5 block text-xs font-medium text-slate-500 uppercase dark:text-slate-400">分类</label>
-              <select 
-                className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm focus:ring-1 focus:ring-slate-900 focus:outline-none dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200"
+            <Select 
+                label="分类"
                 value={editingCard.categoryId}
                 onChange={e => setEditingCard({...editingCard, categoryId: e.target.value})}
               >
                 {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
+            </Select>
           </div>
           <div className="w-full">
             <label className="mb-1.5 block text-xs font-medium text-slate-500 uppercase dark:text-slate-400">描述</label>

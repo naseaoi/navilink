@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, ChevronDown } from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -31,6 +31,23 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { lab
       className={`flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-500 ${className}`}
       {...props}
     />
+  </div>
+);
+
+export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { label?: string }> = ({ label, className = '', children, ...props }) => (
+  <div className="w-full">
+    {label && <label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</label>}
+    <div className="relative">
+      <select
+        className={`appearance-none flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-sm focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-500 ${className}`}
+        {...props}
+      >
+        {children}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500 dark:text-slate-400">
+        <ChevronDown size={16} />
+      </div>
+    </div>
   </div>
 );
 
