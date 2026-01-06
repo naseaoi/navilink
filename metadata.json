@@ -1,0 +1,5 @@
+{
+  "name": "导航站",
+  "description": "A modern, card-based navigation dashboard with WebDAV synchronization, admin backend, and responsive design.",
+  "requestFramePermissions": []
+}
