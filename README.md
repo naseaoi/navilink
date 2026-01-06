@@ -34,7 +34,7 @@ NaviLink 是一个现代化的、极简风格的导航网站。它采用卡片�
 
 部署完成后，您可以访问您的域名：
 *   **首页**：查看导航。
-*   **后台**：访问 `https://your-domain.vercel.app/#/tat` 进入管理后台（初始账号 `admin`，密码 `admin123`，请尽快修改）。
+*   **后台**：访问 `https://your-domain.vercel.app/tat` 进入管理后台（初始账号 `admin`，密码 `admin123`，请尽快修改）。
 
 ## 开发指南
 

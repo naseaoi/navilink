@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { PublicView } from './components/PublicView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { webdav } from './services/webdavService';
@@ -172,8 +172,8 @@ const MainApp = () => {
 
 export default function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <MainApp />
-    </HashRouter>
+    </BrowserRouter>
   );
 }
