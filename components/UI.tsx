@@ -4,12 +4,12 @@ import { X, Loader2, ChevronDown, Eye, EyeOff, AlertCircle, CheckCircle2, Info }
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
   isLoading?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md', isLoading, className = '', children, ...props }) => {
-  const base = "inline-flex items-center justify-center rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
+  const base = "inline-flex items-center justify-center font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
   
   const variants = {
     primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-200 dark:shadow-none",
@@ -19,15 +19,15 @@ export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md'
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm",
-    lg: "px-6 py-3 text-base"
+    sm: "px-3 py-1.5 text-xs rounded-lg",
+    md: "px-4 py-2 text-sm rounded-xl",
+    lg: "px-6 py-3 text-base rounded-xl",
+    icon: "p-2 rounded-xl w-10 h-10"
   };
 
   return (
     <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} disabled={isLoading || props.disabled} {...props}>
-      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      {children}
+      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
     </button>
   );
 };
@@ -35,9 +35,9 @@ export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md'
 // --- Input ---
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string }> = ({ label, className = '', ...props }) => (
   <div className="w-full">
-    {label && <label className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</label>}
+    {label && <label className="mb-1.5 block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
     <input
-      className={`flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 ${className}`}
+      className={`flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 ${className}`}
       {...props}
     />
   </div>
@@ -48,11 +48,11 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
   const [show, setShow] = useState(false);
   return (
     <div className="w-full">
-      {label && <label className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</label>}
+      {label && <label className="mb-1.5 block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
       <div className="relative">
         <input
           type={show ? 'text' : 'password'}
-          className={`flex h-11 w-full rounded-xl border border-slate-200 bg-white pl-4 pr-12 py-2 text-sm transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:outline-none dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 ${className}`}
+          className={`flex h-11 w-full rounded-xl border border-slate-200 bg-white pl-4 pr-12 py-2 text-sm transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 ${className}`}
           {...props}
         />
         <button 
@@ -70,16 +70,16 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
 // --- Select ---
 export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { label?: string }> = ({ label, className = '', children, ...props }) => (
   <div className="w-full">
-    {label && <label className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</label>}
+    {label && <label className="mb-1.5 block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
     <div className="relative">
       <select
-        className={`appearance-none flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 pr-10 text-sm transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 ${className}`}
+        className={`appearance-none flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 pr-10 text-sm transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 cursor-pointer ${className}`}
         {...props}
       >
         {children}
       </select>
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-        <ChevronDown size={18} />
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400 border-l border-slate-100 ml-2 dark:border-slate-800">
+        <ChevronDown size={16} strokeWidth={3} />
       </div>
     </div>
   </div>
@@ -90,14 +90,14 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 dark:bg-slate-900 dark:border dark:border-slate-800">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 dark:bg-slate-900 dark:border dark:border-slate-800">
         <div className="flex items-center justify-between px-8 py-6 border-b border-slate-50 dark:border-slate-800">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+          <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">{title}</h3>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all dark:hover:bg-slate-800 dark:hover:text-slate-200">
             <X size={20} />
           </button>
         </div>
-        <div className="px-8 py-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+        <div className="px-8 py-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
           {children}
         </div>
       </div>
@@ -118,13 +118,13 @@ export const ConfirmModal: React.FC<{
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800">
         <div className="text-center">
-          <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 ${variant === 'danger' ? 'bg-red-50 text-red-500' : 'bg-indigo-50 text-indigo-500'} dark:bg-opacity-10`}>
-            {variant === 'danger' ? <AlertCircle size={32} /> : <Info size={32} />}
+          <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-4 ${variant === 'danger' ? 'bg-red-50 text-red-500' : 'bg-indigo-50 text-indigo-500'} dark:bg-opacity-10`}>
+            {variant === 'danger' ? <AlertCircle size={28} /> : <Info size={28} />}
           </div>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{title}</h3>
-          <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-8">{message}</p>
+          <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 mb-2">{title}</h3>
+          <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-8 font-medium">{message}</p>
           <div className="flex gap-3">
             <Button variant="secondary" className="flex-1" onClick={onClose}>取消</Button>
             <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); onClose(); }}>{confirmText}</Button>
@@ -168,16 +168,16 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: (id: number) => void 
   };
 
   return (
-    <div className={`pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-2xl border shadow-xl animate-in slide-in-from-top-4 duration-300 ${styles[toast.type]}`}>
+    <div className={`pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-xl border shadow-xl animate-in slide-in-from-top-4 duration-300 ${styles[toast.type]}`}>
       {icons[toast.type]}
-      <span className="text-sm font-semibold">{toast.message}</span>
+      <span className="text-sm font-bold">{toast.message}</span>
     </div>
   );
 };
 
 // --- Card ---
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-3xl border border-slate-200 shadow-sm transition-all dark:bg-slate-900 dark:border-slate-800 ${className}`}>
+  <div className={`bg-white rounded-xl border border-slate-200 shadow-sm transition-all dark:bg-slate-900 dark:border-slate-800 ${className}`}>
     {children}
   </div>
 );

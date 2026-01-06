@@ -53,12 +53,12 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
           <div className="flex items-center gap-3">
             {data.settings.icon ? (
                data.settings.icon.startsWith('http') ? 
-                 <img src={data.settings.icon} alt="Logo" className="w-8 h-8 rounded object-cover" /> :
+                 <img src={data.settings.icon} alt="Logo" className="w-8 h-8 rounded-lg object-cover" /> :
                  <span className="text-2xl">{data.settings.icon}</span> 
             ) : (
                <Compass className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
             )}
-            <h1 className="font-bold text-lg text-slate-800 dark:text-slate-100 hidden sm:block">{data.settings.title}</h1>
+            <h1 className="font-black text-lg text-slate-800 dark:text-slate-100 hidden sm:block tracking-tight">{data.settings.title}</h1>
           </div>
           
           <div className="flex-1 max-w-md relative">
@@ -66,7 +66,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
             <input 
               type="text"
               placeholder="搜索链接..."
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:focus:ring-indigo-500/20"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -77,10 +77,10 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
         <div className="max-w-6xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex gap-2">
           <button 
             onClick={() => setSelectedCategory('all')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
               selectedCategory === 'all' 
-                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' 
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-800'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-800'
             }`}
           >
             全部
@@ -89,10 +89,10 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
             <button 
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
                 selectedCategory === cat.id 
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' 
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-800'
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-800'
               }`}
             >
               {cat.name}
@@ -102,36 +102,34 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
       </header>
 
       {/* Grid */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-12">
         {filteredCards.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-600">
-            <Inbox className="w-16 h-16 mb-4 opacity-50" />
-            <p>未找到相关链接</p>
+          <div className="flex flex-col items-center justify-center py-24 text-slate-300 dark:text-slate-700">
+            <Inbox className="w-20 h-20 mb-4 opacity-30" />
+            <p className="font-bold uppercase tracking-widest text-sm">未找到相关链接</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
             {filteredCards.map(card => (
               <div 
                 key={card.id}
                 onClick={() => handleCardClick(card.url)}
-                className="group bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer flex items-start gap-4 dark:bg-slate-900 dark:border-slate-800 dark:hover:border-slate-700"
+                className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 hover:border-indigo-400 transition-all cursor-pointer flex items-start gap-4 dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500/50"
               >
-                <div className="w-12 h-12 shrink-0 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden dark:bg-slate-800 dark:border-slate-700">
-                   {/* Fallback icon handling */}
+                <div className="w-14 h-14 shrink-0 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden dark:bg-slate-800 dark:border-slate-700">
                    <img 
                     src={card.icon} 
                     alt={card.title}
-                    className="w-8 h-8 object-contain"
+                    className="w-10 h-10 object-contain transition-transform group-hover:scale-110"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`;
                     }}
                    />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900 truncate pr-4 dark:text-slate-100">{card.title}</h3>
-                  <p className="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed dark:text-slate-400">{card.description}</p>
+                <div className="flex-1 min-w-0 pt-1">
+                  <h3 className="font-bold text-slate-900 truncate pr-4 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{card.title}</h3>
+                  <p className="text-xs text-slate-500 line-clamp-2 mt-1.5 leading-relaxed dark:text-slate-400 font-medium">{card.description}</p>
                 </div>
-                <ExternalLink className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity absolute top-4 right-4 dark:text-slate-600" />
               </div>
             ))}
           </div>
@@ -139,26 +137,26 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
       </main>
 
       {/* Footer */}
-      <footer className="py-8 text-center text-xs text-slate-400 dark:text-slate-600">
-        <p>Powered by NaviLink</p>
+      <footer className="py-12 text-center">
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 dark:text-slate-800">Powered by NaviLink Console</p>
       </footer>
 
       {/* Confirmation Modal */}
       <Modal 
         isOpen={!!confirmUrl} 
         onClose={() => setConfirmUrl(null)} 
-        title="即将离开"
+        title="即将离开本站"
       >
-        <div className="space-y-4">
-          <p className="text-slate-600 text-sm dark:text-slate-300">
-            您即将访问外部网站，是否继续跳转至：
+        <div className="space-y-6">
+          <p className="text-slate-500 text-sm font-medium dark:text-slate-400">
+            正在准备跳转至第三方链接，请确认：
           </p>
-          <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-700 break-all border border-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
+          <div className="p-4 bg-slate-50 rounded-xl text-[11px] font-mono text-slate-500 break-all border border-slate-100 dark:bg-slate-950 dark:border-slate-800 dark:text-indigo-400/70">
             {confirmUrl}
           </div>
-          <div className="flex gap-3 justify-end pt-2">
-            <Button variant="secondary" onClick={() => setConfirmUrl(null)}>取消</Button>
-            <Button variant="primary" onClick={proceedToLink}>继续访问 <ExternalLink className="ml-2 w-3 h-3" /></Button>
+          <div className="flex gap-4 pt-4">
+            <Button variant="secondary" onClick={() => setConfirmUrl(null)} className="flex-1">留在本站</Button>
+            <Button variant="primary" onClick={proceedToLink} className="flex-1">立即前往 <ExternalLink className="ml-2 w-3 h-3" /></Button>
           </div>
         </div>
       </Modal>
