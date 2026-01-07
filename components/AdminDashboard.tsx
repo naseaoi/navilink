@@ -84,7 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   );
 
   return (
-    <div className="fixed inset-0 h-[100dvh] flex flex-col md:flex-row bg-[#fafaf9] dark:bg-[#1c1917] overflow-hidden font-sans text-stone-800 dark:text-stone-200">
+    <div className="fixed inset-0 h-screen w-screen flex flex-col md:flex-row bg-[#fafaf9] dark:bg-[#1c1917] overflow-hidden font-sans text-stone-800 dark:text-stone-200">
       <ToastContainer messages={toasts} onRemove={removeToast} />
       <ConfirmModal 
         isOpen={confirmConfig.isOpen} onClose={() => setConfirmConfig(p=>({...p, isOpen: false}))} 
@@ -107,7 +107,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-w-0 bg-[#fafaf9] dark:bg-[#1c1917]">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#fafaf9] dark:bg-[#1c1917]">
         <header className="flex-shrink-0 flex justify-between items-center p-4 md:px-10 md:py-6 bg-[#fafaf9]/80 backdrop-blur-md border-b border-stone-200 dark:bg-[#1c1917]/80 dark:border-stone-800">
           <div className="flex items-center gap-3">
              <button className="md:hidden p-2 -ml-2 text-stone-600 dark:text-stone-300" onClick={() => setIsMobileMenuOpen(true)}>
@@ -130,8 +130,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           </Button>
         </header>
 
-        {/* Added min-h-0 to allow flex container to shrink and scroll properly */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar">
+        {/* 使用 flex-1 和 min-h-0 确保容器能被 flex 压缩并产生滚动，移除了 overscroll-contain 避免冲突 */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
            <div className="max-w-6xl mx-auto space-y-8 pb-32">
               {activeTab === 'settings' && <SettingsTab dataP={localPublic} dataV={localPrivate} onP={d=>{setLocalPublic(d); markChanged();}} onV={d=>{setLocalPrivate(d); markChanged();}} />}
               {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
@@ -221,7 +221,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!draggedId) return;
-    // Critical: Prevent default scroll behavior while dragging
+    // 只有在拖拽手柄上触发拖动时才阻止默认事件（防止页面随手柄一起滚动）
     if (e.cancelable) e.preventDefault();
     
     const touch = e.touches[0];
