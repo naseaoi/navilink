@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PublicData, PrivateData, LinkCard, Category } from '../types';
 import { webdav } from '../services/webdavService';
 import { Button, Input, Select, Modal, Card, PasswordInput, ToastContainer, ToastMessage, ToastType, ConfirmModal } from './UI';
@@ -130,7 +130,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           </Button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar overscroll-contain">
            <div className="max-w-6xl mx-auto space-y-8 pb-32">
               {activeTab === 'settings' && <SettingsTab dataP={localPublic} dataV={localPrivate} onP={d=>{setLocalPublic(d); markChanged();}} onV={d=>{setLocalPrivate(d); markChanged();}} />}
               {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
@@ -213,6 +213,29 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
     }
   };
 
+  // Mobile Touch Logic
+  const handleTouchStart = (e: React.TouchEvent, id: string) => {
+    setDraggedId(id);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!draggedId) return;
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cardEl = target?.closest('[data-card-id]');
+    
+    if (cardEl) {
+      const targetId = cardEl.getAttribute('data-card-id');
+      if (targetId && targetId !== draggedId) {
+        onDragEnter(targetId);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setDraggedId(null);
+  };
+
   const openEdit = (card: LinkCard) => { setEditingCard(card); setIsModalOpen(true); };
   const save = () => {
     if (!editingCard.title || !editingCard.url) return;
@@ -240,6 +263,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
         {sorted.map(card => (
           <div 
             key={card.id} 
+            data-card-id={card.id}
             onDragOver={e=>e.preventDefault()} 
             onDragEnter={()=>onDragEnter(card.id)} 
             className={`group relative bg-white pl-2 pr-3 py-3 rounded-xl border border-stone-200 flex items-center gap-2 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
@@ -248,7 +272,10 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               draggable 
               onDragStart={()=>onDragStart(card.id)} 
               onDragEnd={()=>setDraggedId(null)}
-              className="cursor-grab active:cursor-grabbing p-1 text-stone-300 hover:text-stone-500 touch-none"
+              onTouchStart={(e) => handleTouchStart(e, card.id)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              className="cursor-grab active:cursor-grabbing p-2 -ml-1 text-stone-300 hover:text-stone-500 touch-none"
             >
               <GripVertical size={16} />
             </div>
