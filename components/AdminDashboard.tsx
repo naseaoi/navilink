@@ -320,14 +320,14 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
         <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10 shrink-0"><Plus size={20}/></Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
         {sorted.map(card => (
           <div 
             key={card.id} 
             data-card-id={card.id}
             onDragOver={e=>e.preventDefault()} 
             onDragEnter={()=>onDragEnter(card.id)} 
-            className={`group relative bg-white pl-4 pr-5 py-5 rounded-2xl border border-stone-200 flex items-center gap-5 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
+            className={`group relative bg-white pl-5 pr-7 py-6 rounded-2xl border border-stone-200 flex items-center gap-4 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
           >
             <div 
               draggable 
@@ -336,27 +336,27 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               onTouchStart={(e) => handleTouchStart(e, card.id)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="cursor-grab active:cursor-grabbing p-1.5 -ml-2.5 text-stone-300 hover:text-stone-500 touch-none"
+              className="cursor-grab active:cursor-grabbing p-1 -ml-3.5 text-stone-300 hover:text-stone-500 touch-none shrink-0"
             >
-              <GripVertical size={18} />
+              <GripVertical size={14} />
             </div>
-            <div className="w-14 h-14 shrink-0 bg-stone-50 rounded-xl flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800">
+            <div className="w-16 h-16 shrink-0 bg-stone-50 rounded-xl flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800">
               <img 
                 src={card.icon} 
-                className="w-8 h-8 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
+                className="w-9 h-9 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
                 onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64` } catch {} }}
                 alt=""
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-              <h4 className="font-bold text-lg text-stone-800 dark:text-stone-200 leading-tight break-all">{card.title}</h4>
+              <h4 className="font-bold text-xl text-stone-800 dark:text-stone-200 leading-tight break-all">{card.title}</h4>
               {card.description && <p className="text-sm text-stone-400 line-clamp-1 leading-tight">{card.description}</p>}
               <p className="text-xs text-stone-300 font-mono truncate">
                 {(() => { try { return new URL(card.url).hostname } catch { return card.url } })()}
               </p>
             </div>
             
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1.5 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">
               <button onClick={()=>openEdit(card)} className="p-2 hover:bg-stone-100 rounded-md text-stone-500 hover:text-stone-800"><Edit2 size={16}/></button>
               <button onClick={()=>handleDelete(card.id)} className="p-2 hover:bg-red-50 rounded-md text-stone-500 hover:text-red-500"><Trash2 size={16}/></button>
             </div>
