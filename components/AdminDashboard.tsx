@@ -131,7 +131,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         </header>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
-           <div className="max-w-6xl mx-auto space-y-8 pb-32">
+           <div className="max-w-7xl mx-auto space-y-8 pb-32">
               {activeTab === 'settings' && <SettingsTab dataP={localPublic} dataV={localPrivate} onP={d=>{setLocalPublic(d); markChanged();}} onV={d=>{setLocalPrivate(d); markChanged();}} />}
               {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
               {activeTab === 'categories' && <CategoriesTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
@@ -248,7 +248,6 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
 
     if (draggedIdx === -1 || targetIdx === -1) return;
 
-    // Simple swap of order numbers for now, more robust logic could re-index
     const draggedOrder = allCards[draggedIdx].order;
     allCards[draggedIdx].order = allCards[targetIdx].order;
     allCards[targetIdx].order = draggedOrder;
@@ -276,7 +275,6 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
   };
 
   const handleTouchEnd = () => {
-    // After drag, re-index to ensure order is sequential
     const reindexed = data.cards
       .sort((a:LinkCard, b:LinkCard) => a.order - b.order)
       .map((card: LinkCard, index: number) => ({ ...card, order: index }));
@@ -294,7 +292,6 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
     if (idx >= 0) {
       cards[idx] = editingCard as LinkCard;
     } else {
-      // Ensure new card gets a valid order number
       const maxOrder = Math.max(...cards.map(c => c.order), -1);
       cards.push({ ...editingCard, order: maxOrder + 1 } as LinkCard);
     }
@@ -320,15 +317,16 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
         <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10 shrink-0"><Plus size={20}/></Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-x-8 gap-y-6">
         {sorted.map(card => (
           <div 
             key={card.id} 
             data-card-id={card.id}
             onDragOver={e=>e.preventDefault()} 
             onDragEnter={()=>onDragEnter(card.id)} 
-            className={`group relative bg-white pl-5 pr-8 py-6 rounded-2xl border border-stone-200 flex items-center gap-5 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
+            className={`group relative bg-white pl-3 pr-10 py-5 rounded-2xl border border-stone-200 flex items-center gap-4 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
           >
+            {/* 拖拽图标：更小、占比更低 */}
             <div 
               draggable 
               onDragStart={()=>onDragStart(card.id)} 
@@ -336,11 +334,13 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               onTouchStart={(e) => handleTouchStart(e, card.id)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="cursor-grab active:cursor-grabbing p-1 -ml-4 text-stone-300 hover:text-stone-500 touch-none shrink-0"
+              className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-stone-300 hover:text-stone-500 touch-none shrink-0"
             >
-              <GripVertical size={14} />
+              <GripVertical size={12} />
             </div>
-            <div className="w-16 h-16 shrink-0 bg-stone-50 rounded-xl flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800">
+
+            {/* Icon：保持清晰度，调整间距 */}
+            <div className="w-16 h-16 shrink-0 bg-stone-50 rounded-xl flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800 group-hover:scale-105 transition-transform duration-300">
               <img 
                 src={card.icon} 
                 className="w-9 h-9 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
@@ -348,17 +348,20 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
                 alt=""
               />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-              <h4 className="font-bold text-xl text-stone-800 dark:text-stone-200 leading-tight break-all">{card.title}</h4>
-              {card.description && <p className="text-sm text-stone-400 line-clamp-1 leading-tight">{card.description}</p>}
-              <p className="text-xs text-stone-300 font-mono truncate">
+
+            {/* 文字内容：充分利用拉长的宽度 */}
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5 overflow-hidden">
+              <h4 className="font-bold text-xl text-stone-800 dark:text-stone-200 leading-tight truncate">{card.title}</h4>
+              {card.description && <p className="text-sm text-stone-400 truncate leading-tight">{card.description}</p>}
+              <p className="text-xs text-stone-300 font-mono truncate opacity-80">
                 {(() => { try { return new URL(card.url).hostname } catch { return card.url } })()}
               </p>
             </div>
             
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1.5 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">
-              <button onClick={()=>openEdit(card)} className="p-2 hover:bg-stone-100 rounded-md text-stone-500 hover:text-stone-800"><Edit2 size={16}/></button>
-              <button onClick={()=>handleDelete(card.id)} className="p-2 hover:bg-red-50 rounded-md text-stone-500 hover:text-red-500"><Trash2 size={16}/></button>
+            {/* 操作按钮：悬浮显示 */}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/95 dark:bg-stone-900/95 backdrop-blur-sm p-1.5 rounded-xl shadow-lg border border-stone-100 dark:border-stone-800">
+              <button onClick={()=>openEdit(card)} className="p-2.5 hover:bg-stone-100 rounded-lg text-stone-500 hover:text-stone-800 dark:hover:bg-stone-800"><Edit2 size={16}/></button>
+              <button onClick={()=>handleDelete(card.id)} className="p-2.5 hover:bg-red-50 rounded-lg text-stone-500 hover:text-red-500 dark:hover:bg-red-950/30"><Trash2 size={16}/></button>
             </div>
           </div>
         ))}
