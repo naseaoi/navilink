@@ -228,7 +228,12 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <Select options={[{value:'all', label:'显示所有卡片'}, ...data.categories.map((c:any)=>({value:c.id, label:c.name}))]} value={filterCat} onChange={setFilterCat} className="md:w-64" />
+        <Select 
+          options={[{value:'all', label:'所有卡片'}, ...data.categories.map((c:any)=>({value:c.id, label:c.name}))]} 
+          value={filterCat} 
+          onChange={setFilterCat} 
+          className="w-full md:w-fit md:min-w-[150px]" 
+        />
         <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', order:data.cards.length, url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10"><Plus size={20}/></Button>
       </div>
 
@@ -236,15 +241,15 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
         {sorted.map(card => (
           <div 
             key={card.id} draggable onDragStart={()=>onDragStart(card.id)} onDragOver={e=>e.preventDefault()} onDragEnter={()=>onDragEnter(card.id)} onDragEnd={()=>setDraggedId(null)}
-            className={`group relative bg-white p-4 rounded-xl border border-stone-200 flex items-start gap-3 transition-all cursor-grab active:cursor-grabbing hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
+            className={`group relative bg-white p-4 rounded-xl border border-stone-200 flex items-center gap-3 transition-all cursor-grab active:cursor-grabbing hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
           >
-            <GripVertical size={16} className="text-stone-300 shrink-0 mt-2" />
+            <GripVertical size={16} className="text-stone-300 shrink-0" />
             <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800">
               <img src={card.icon} className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" onError={e=>(e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}/>
             </div>
             <div className="flex-1 min-w-0 flex flex-col gap-1">
               <h4 className="font-bold text-sm text-stone-800 dark:text-stone-200 leading-tight break-all">{card.title}</h4>
-              {card.description && <p className="text-[10px] text-stone-400 line-clamp-2 leading-relaxed">{card.description}</p>}
+              {card.description && <p className="text-[10px] text-stone-400 line-clamp-1 leading-relaxed">{card.description}</p>}
               <p className="text-[10px] text-stone-300 font-mono truncate">{new URL(card.url).hostname}</p>
             </div>
             
