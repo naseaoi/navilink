@@ -1,6 +1,7 @@
 export interface SiteSettings {
   title: string;
   icon: string; // URL or emoji
+  footerText?: string; // Custom footer text
 }
 
 export interface Category {

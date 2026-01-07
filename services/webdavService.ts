@@ -3,7 +3,8 @@ import { PublicData, PrivateData, EnvConfig } from '../types';
 const DEFAULT_PUBLIC_DATA: PublicData = {
   settings: {
     title: "我的导航",
-    icon: "" 
+    icon: "",
+    footerText: "© 2025 NaviLink. Minimalism."
   },
   categories: [
     { id: "cat_1", name: "常用工具", order: 0 },

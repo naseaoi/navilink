@@ -5,7 +5,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { webdav } from './services/webdavService';
 import { AppState, PrivateData } from './types';
 import { Button, Input, Card } from './components/UI';
-import { ShieldCheck, Compass } from 'lucide-react';
+import { ShieldCheck, Compass, CheckSquare, Square } from 'lucide-react';
 
 const AUTH_KEY = 'navilink_auth';
 const checkAuth = () => {
@@ -21,15 +21,19 @@ const checkAuth = () => {
 const AdminLogin: React.FC<{ onLogin: () => void; privateData: PrivateData | null }> = ({ onLogin, privateData }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
+  
   const handleLogin = () => {
     if (!privateData) return;
     if (username === privateData.admin.username && password === privateData.admin.passwordHash) {
       localStorage.setItem(AUTH_KEY, 'true');
-      localStorage.setItem(`${AUTH_KEY}_expiry`, (new Date().getTime() + 86400000).toString()); // 24h
+      const duration = remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days vs 24 hours
+      localStorage.setItem(`${AUTH_KEY}_expiry`, (new Date().getTime() + duration).toString());
       onLogin();
     } else setError("凭据无效");
   };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#fafaf9] p-6 dark:bg-[#1c1917] font-sans">
       <Card className="w-full max-w-sm p-10 space-y-8 animate-in zoom-in-95 duration-500 border border-stone-200 shadow-xl shadow-stone-200/50 dark:border-stone-800 dark:shadow-none">
@@ -42,6 +46,10 @@ const AdminLogin: React.FC<{ onLogin: () => void; privateData: PrivateData | nul
         <div className="space-y-5">
           <Input label="用户名" value={username} onChange={e=>setUsername(e.target.value)} />
           <Input label="授权密码" type="password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleLogin()} />
+          <div className="flex items-center gap-2 cursor-pointer text-stone-600 dark:text-stone-400 select-none" onClick={()=>setRemember(!remember)}>
+             {remember ? <CheckSquare size={18} className="text-stone-900 dark:text-stone-100" /> : <Square size={18} />}
+             <span className="text-sm">30天免登录</span>
+          </div>
         </div>
         <Button className="w-full py-3 rounded-xl text-base shadow-lg shadow-stone-900/10" onClick={handleLogin}>验证身份</Button>
       </Card>
@@ -117,14 +125,24 @@ const MainApp = () => {
     <Routes>
       <Route path="/" element={<PublicView data={state.publicData} theme={theme} onToggleTheme={toggleTheme} />} />
       <Route path="/tat" element={
-        isAuthenticated && privateData ? (
-          <AdminDashboard 
-            publicData={state.publicData} 
-            privateData={privateData}
-            onUpdatePublic={d=>setState(s=>({...s, publicData:d}))}
-            onUpdatePrivate={setPrivateData}
-            onLogout={() => { localStorage.removeItem(AUTH_KEY); setIsAuthenticated(false); }} 
-          />
+        // Fix flash: If authenticated but privateData not yet loaded, show loading instead of login
+        isAuthenticated ? (
+          privateData ? (
+            <AdminDashboard 
+              publicData={state.publicData} 
+              privateData={privateData}
+              onUpdatePublic={d=>setState(s=>({...s, publicData:d}))}
+              onUpdatePrivate={setPrivateData}
+              onLogout={() => { localStorage.removeItem(AUTH_KEY); setIsAuthenticated(false); }} 
+            />
+          ) : (
+            // Re-using the loading spinner style for admin transition
+             <div className="h-screen w-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917]">
+                <div className="w-12 h-12 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl animate-bounce">
+                  <Compass size={24} />
+                </div>
+             </div>
+          )
         ) : <AdminLogin onLogin={()=>setIsAuthenticated(true)} privateData={privateData} />
       } />
       <Route path="/admin" element={<Navigate to="/" replace />} />

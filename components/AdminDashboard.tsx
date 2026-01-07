@@ -154,6 +154,7 @@ const SettingsTab = ({ dataP, dataV, onP, onV }: any) => (
       <h3 className="text-lg font-serif font-bold flex items-center gap-2 text-stone-900 dark:text-stone-100"><Layout size={18}/> 基础信息</h3>
       <Input label="站点标题" value={dataP.settings.title} onChange={e=>onP({...dataP, settings:{...dataP.settings, title:e.target.value}})} />
       <Input label="站点图标 (Emoji/URL)" value={dataP.settings.icon} onChange={e=>onP({...dataP, settings:{...dataP.settings, icon:e.target.value}})} />
+      <Input label="底部文字" value={dataP.settings.footerText || ''} placeholder="© 2025 NaviLink..." onChange={e=>onP({...dataP, settings:{...dataP.settings, footerText:e.target.value}})} />
     </Card>
     <Card className="p-8 border-red-100 dark:border-red-900/20 space-y-6">
       <h3 className="text-lg font-serif font-bold flex items-center gap-2 text-red-700 dark:text-red-400"><Shield size={18}/> 管理账号</h3>

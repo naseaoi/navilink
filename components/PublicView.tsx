@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PublicData, LinkCard } from '../types';
 import { Search, Compass, ArrowUpRight, Command, X, Sun, Moon, Monitor } from 'lucide-react';
 import { Modal, Button } from './UI';
+import { useNavigate } from 'react-router-dom';
 
 interface PublicViewProps {
   data: PublicData;
@@ -10,11 +11,29 @@ interface PublicViewProps {
 }
 
 export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', onToggleTheme }) => {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmUrl, setConfirmUrl] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Triple Click Logic
+  const clickRef = useRef({ count: 0, lastTime: 0 });
+  const handleTitleClick = () => {
+    const now = Date.now();
+    if (now - clickRef.current.lastTime < 500) {
+      clickRef.current.count += 1;
+    } else {
+      clickRef.current.count = 1;
+    }
+    clickRef.current.lastTime = now;
+    
+    if (clickRef.current.count === 3) {
+      clickRef.current.count = 0;
+      navigate('/tat');
+    }
+  };
 
   // Sync Document Title
   useEffect(() => {
@@ -68,7 +87,10 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
       <header className="sticky top-0 z-40 bg-[#fafaf9]/80 dark:bg-[#1c1917]/80 backdrop-blur-md border-b border-stone-200/50 dark:border-stone-800/50 transition-all">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Logo / Title */}
-          <div className="flex items-center gap-3 select-none">
+          <div 
+            className="flex items-center gap-3 select-none cursor-default active:scale-95 transition-transform"
+            onClick={handleTitleClick}
+          >
             <div className="w-10 h-10 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl shadow-stone-900/10">
               {data.settings.icon && !data.settings.icon.startsWith('http') ? (
                 <span className="text-lg">{data.settings.icon}</span>
@@ -158,7 +180,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
 
       {/* --- Simple Footer --- */}
       <footer className="py-12 text-center text-stone-400 text-sm font-medium">
-        © 2025 {data.settings.title}. Minimalism.
+        {data.settings.footerText || `© 2025 ${data.settings.title}. Minimalism.`}
       </footer>
 
       {/* --- Exit Modal --- */}
@@ -219,7 +241,8 @@ const CardItem: React.FC<{ card: LinkCard; onClick: () => void; style?: React.CS
       <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 mb-1 line-clamp-1 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors">
         {card.title}
       </h3>
-      <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed line-clamp-2">
+      {/* Changed line-clamp-2 to line-clamp-1 */}
+      <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed line-clamp-1">
         {card.description || 'No description available.'}
       </p>
     </div>
