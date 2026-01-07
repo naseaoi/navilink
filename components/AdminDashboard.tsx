@@ -94,12 +94,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         </nav>
 
         <div className="p-6 border-t border-white/5 space-y-3">
-          <button 
+          <Button 
+            variant="info" 
+            className="w-full justify-start py-3 h-auto rounded-xl" 
             onClick={() => navigate('/')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
           >
-            <Home size={18} /> 返回首页
-          </button>
+            <Home size={18} className="mr-2" /> 返回首页
+          </Button>
           <Button variant="danger" className="w-full justify-start py-3 h-auto rounded-xl" onClick={onLogout}>
             <LogOut size={18} className="mr-2" /> 退出登录
           </Button>
@@ -122,7 +123,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar">
-           {/* Removed max-w-4xl for adaptive width */}
            <div className="max-w-[1600px] mx-auto space-y-8 pb-32">
               {activeTab === 'settings' && (
                 <SettingsTab 
@@ -254,17 +254,27 @@ const CategoriesTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => v
         {data.categories.map((cat) => (
           <div key={cat.id} className="flex items-center gap-4 p-5 bg-white rounded-xl border border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 transition-all hover:border-indigo-200">
             {editingId === cat.id ? (
-              <div className="flex-1 flex gap-3">
-                <Input autoFocus value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEdit(cat.id)} />
-                <Button size="sm" onClick={() => saveEdit(cat.id)}>确认</Button>
+              <div className="flex-1 flex flex-row items-center gap-3">
+                <div className="flex-1">
+                  <Input 
+                    autoFocus 
+                    value={tempName} 
+                    onChange={e => setTempName(e.target.value)} 
+                    onKeyDown={e => e.key === 'Enter' && saveEdit(cat.id)} 
+                  />
+                </div>
+                <Button size="sm" onClick={() => saveEdit(cat.id)} className="shrink-0">确认</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="shrink-0 text-slate-400">取消</Button>
               </div>
             ) : (
               <span className="flex-1 font-bold text-slate-700 dark:text-slate-200">{cat.name}</span>
             )}
-            <div className="flex gap-1">
-              <button onClick={() => startEdit(cat)} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={18}/></button>
-              <button onClick={() => deleteCategory(cat.id)} className="p-2.5 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={18}/></button>
-            </div>
+            {!editingId || editingId !== cat.id ? (
+              <div className="flex gap-1">
+                <button onClick={() => startEdit(cat)} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={18}/></button>
+                <button onClick={() => deleteCategory(cat.id)} className="p-2.5 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={18}/></button>
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -276,37 +286,59 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Partial<LinkCard>>({});
   const [filterCat, setFilterCat] = useState('all');
+  const [draggedId, setDraggedId] = useState<string | null>(null);
 
   const filteredCards = filterCat === 'all' 
     ? data.cards 
     : data.cards.filter(c => c.categoryId === filterCat);
 
-  // Sorting Logic
   const sortedCards = [...filteredCards].sort((a, b) => a.order - b.order);
 
+  const updateCardOrder = (newSortedList: LinkCard[]) => {
+    const updatedCards = [...data.cards];
+    newSortedList.forEach((item, index) => {
+      const globalIdx = updatedCards.findIndex(c => c.id === item.id);
+      if (globalIdx !== -1) {
+        updatedCards[globalIdx] = { ...updatedCards[globalIdx], order: index };
+      }
+    });
+    onChange({ ...data, cards: updatedCards });
+  };
+
   const moveCard = (id: string, direction: 'up' | 'down') => {
-    const newCards = [...data.cards];
-    const index = newCards.findIndex(c => c.id === id);
-    if (index < 0) return;
+    const index = sortedCards.findIndex(c => c.id === id);
+    if (index === -1) return;
 
-    // Find the target card to swap within the SAME filter if active, or just global
-    const sameCategoryCards = filterCat === 'all' ? newCards : newCards.filter(c => c.categoryId === filterCat);
-    const sortedInCategory = [...sameCategoryCards].sort((a, b) => a.order - b.order);
-    const inCategoryIndex = sortedInCategory.findIndex(c => c.id === id);
-
-    if (direction === 'up' && inCategoryIndex > 0) {
-      const prevCard = sortedInCategory[inCategoryIndex - 1];
-      const targetOrder = prevCard.order;
-      prevCard.order = newCards[index].order;
-      newCards[index].order = targetOrder;
-    } else if (direction === 'down' && inCategoryIndex < sortedInCategory.length - 1) {
-      const nextCard = sortedInCategory[inCategoryIndex + 1];
-      const targetOrder = nextCard.order;
-      nextCard.order = newCards[index].order;
-      newCards[index].order = targetOrder;
+    const newList = [...sortedCards];
+    if (direction === 'up' && index > 0) {
+      [newList[index - 1], newList[index]] = [newList[index], newList[index - 1]];
+    } else if (direction === 'down' && index < newList.length - 1) {
+      [newList[index], newList[index + 1]] = [newList[index + 1], newList[index]];
     }
+    updateCardOrder(newList);
+  };
 
-    onChange({ ...data, cards: newCards });
+  // Drag and Drop Handlers
+  const onDragStart = (id: string) => {
+    setDraggedId(id);
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const onDrop = (targetId: string) => {
+    if (!draggedId || draggedId === targetId) return;
+
+    const newList = [...sortedCards];
+    const fromIdx = newList.findIndex(c => c.id === draggedId);
+    const toIdx = newList.findIndex(c => c.id === targetId);
+
+    const [removed] = newList.splice(fromIdx, 1);
+    newList.splice(toIdx, 0, removed);
+
+    updateCardOrder(newList);
+    setDraggedId(null);
   };
 
   const openNew = () => {
@@ -343,7 +375,7 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
           onChange={(e) => setFilterCat(e.target.value)}
           className="w-full md:w-80 shadow-sm"
         >
-          <option value="all">显示所有分类</option>
+          <option value="all">显示所有卡片 (全部分类)</option>
           {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
         <Button onClick={openNew} size="icon" className="shadow-lg shadow-indigo-600/20 shrink-0">
@@ -353,12 +385,19 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
 
       <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
         {sortedCards.map((card, idx) => (
-          <div key={card.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-5 hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-500/5 transition-all dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500 group">
+          <div 
+            key={card.id} 
+            draggable
+            onDragStart={() => onDragStart(card.id)}
+            onDragOver={onDragOver}
+            onDrop={() => onDrop(card.id)}
+            className={`bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-5 hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-500/5 transition-all dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500 group cursor-grab active:cursor-grabbing ${draggedId === card.id ? 'opacity-30 border-indigo-500 scale-95' : ''}`}
+          >
             <div className="flex flex-col gap-1 pr-2 border-r border-slate-100 dark:border-slate-800">
-              <button onClick={() => moveCard(card.id, 'up')} disabled={idx === 0} className="p-1 hover:bg-slate-100 rounded-lg text-slate-300 hover:text-indigo-600 disabled:opacity-20 transition-all"><ArrowUp size={16}/></button>
-              <button onClick={() => moveCard(card.id, 'down')} disabled={idx === sortedCards.length - 1} className="p-1 hover:bg-slate-100 rounded-lg text-slate-300 hover:text-indigo-600 disabled:opacity-20 transition-all"><ArrowDown size={16}/></button>
+              <button onClick={(e) => { e.stopPropagation(); moveCard(card.id, 'up'); }} disabled={idx === 0} className="p-1 hover:bg-slate-100 rounded-lg text-slate-300 hover:text-indigo-600 disabled:opacity-10 transition-all"><ArrowUp size={16}/></button>
+              <button onClick={(e) => { e.stopPropagation(); moveCard(card.id, 'down'); }} disabled={idx === sortedCards.length - 1} className="p-1 hover:bg-slate-100 rounded-lg text-slate-300 hover:text-indigo-600 disabled:opacity-10 transition-all"><ArrowDown size={16}/></button>
             </div>
-            <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-xl flex items-center justify-center overflow-hidden border border-slate-100 dark:bg-slate-800 dark:border-slate-700">
+            <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-xl flex items-center justify-center overflow-hidden border border-slate-100 dark:bg-slate-800 dark:border-slate-700 pointer-events-none">
                <img 
                 src={card.icon || `https://www.google.com/s2/favicons?domain=${new URL(card.url || 'https://google.com').hostname}&sz=128`} 
                 className="w-10 h-10 object-contain" 
@@ -366,7 +405,7 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
                 onError={(e) => {(e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}} 
               />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pointer-events-none">
               <h4 className="font-bold text-slate-900 truncate dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{card.title}</h4>
               <p className="text-[11px] text-slate-400 truncate mt-1 font-mono tracking-tighter">{card.url}</p>
               <div className="mt-2.5">
@@ -376,8 +415,8 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
               </div>
             </div>
             <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-              <button onClick={() => openEdit(card)} className="p-3 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={18}/></button>
-              <button onClick={() => deleteCard(card.id)} className="p-3 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={18}/></button>
+              <button onClick={(e) => { e.stopPropagation(); openEdit(card); }} className="p-3 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={18}/></button>
+              <button onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }} className="p-3 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={18}/></button>
             </div>
           </div>
         ))}
