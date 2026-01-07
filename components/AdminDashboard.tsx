@@ -130,7 +130,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           </Button>
         </header>
 
-        {/* 使用 flex-1 和 min-h-0 确保容器能被 flex 压缩并产生滚动，移除了 overscroll-contain 避免冲突 */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
            <div className="max-w-6xl mx-auto space-y-8 pb-32">
               {activeTab === 'settings' && <SettingsTab dataP={localPublic} dataV={localPrivate} onP={d=>{setLocalPublic(d); markChanged();}} onV={d=>{setLocalPrivate(d); markChanged();}} />}
@@ -167,19 +166,61 @@ const SettingsTab = ({ dataP, dataV, onP, onV }: any) => (
 
 const CategoriesTab = ({ data, onChange, confirm }: any) => {
   const [editId, setEditId] = useState<string|null>(null);
-  const [tmp, setTmp] = useState('');
-  const add = () => onChange({...data, categories:[...data.categories, {id:`c${Date.now()}`, name:'新分类', order:data.categories.length}]});
+  const [tmpName, setTmpName] = useState('');
+  
+  const addCategory = () => {
+    const newCategory: Category = {
+      id: `cat_${Date.now()}`,
+      name: '新分类',
+      order: data.categories.length,
+    };
+    onChange({ ...data, categories: [...data.categories, newCategory] });
+  };
+  
+  const handleEdit = (category: Category) => {
+    setEditId(category.id);
+    setTmpName(category.name);
+  };
+  
+  const handleSave = (id: string) => {
+    const updated = data.categories.map((c: Category) => c.id === id ? { ...c, name: tmpName } : c);
+    onChange({ ...data, categories: updated });
+    setEditId(null);
+  };
+
+  const handleDelete = (id: string) => {
+    confirm('删除分类', '您确定要删除这个分类吗？分类下的所有卡片也会被移除。', () => {
+       const updatedCats = data.categories.filter((c: Category) => c.id !== id);
+       const updatedCards = data.cards.filter((card: LinkCard) => card.categoryId !== id);
+       onChange({ ...data, categories: updatedCats, cards: updatedCards });
+    }, 'danger');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">分类列表</span>
-        <Button variant="secondary" size="sm" onClick={add}><Plus size={16}/> 新增</Button>
+        <Button variant="secondary" size="sm" onClick={addCategory}><Plus size={16}/> 新增</Button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {data.categories.map((c:any) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {data.categories.sort((a:Category, b:Category) => a.order - b.order).map((c:Category) => (
           <div key={c.id} className="flex items-center gap-3 p-4 bg-white rounded-xl border border-stone-200 dark:bg-stone-900 dark:border-stone-800">
-            {editId === c.id ? <><div className="flex-1 min-w-0"><Input autoFocus value={tmp} onChange={e=>setTmp(e.target.value)} onKeyDown={e=>e.key==='Enter' && (onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}), setEditId(null))} /></div><Button size="sm" onClick={()=>{onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}); setEditId(null);}}>保存</Button></> : <span className="flex-1 font-bold text-stone-700 dark:text-stone-300 truncate">{c.name}</span>}
-            {!editId && <div className="flex gap-1"><button onClick={()=>{setEditId(c.id); setTmp(c.name);}} className="p-2 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-600 transition-colors"><Edit2 size={16}/></button><button onClick={()=>confirm('删除分类','确定删除吗？',()=>onChange({...data, categories:data.categories.filter((x:any)=>x.id!==c.id)}),'danger')} className="p-2 hover:bg-red-50 rounded-lg text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={16}/></button></div>}
+            {editId === c.id ? (
+              <>
+                <div className="flex-1 min-w-0">
+                  <Input autoFocus value={tmpName} onChange={e=>setTmpName(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSave(c.id)} />
+                </div>
+                <Button size="sm" onClick={()=>handleSave(c.id)}>保存</Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 font-bold text-stone-700 dark:text-stone-300 truncate">{c.name}</span>
+                <div className="flex gap-1">
+                  <button onClick={() => handleEdit(c)} className="p-2 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-600 transition-colors"><Edit2 size={16}/></button>
+                  <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-lg text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -197,32 +238,30 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
   const sorted = [...filtered].sort((a,b) => a.order - b.order);
 
   const onDragStart = (id: string) => setDraggedId(id);
+  
   const onDragEnter = (targetId: string) => {
     if (!draggedId || draggedId === targetId) return;
-    const newList = [...sorted];
-    const fromIdx = newList.findIndex(c => c.id === draggedId);
-    const toIdx = newList.findIndex(c => c.id === targetId);
-    if (fromIdx !== -1 && toIdx !== -1) {
-      const [removed] = newList.splice(fromIdx, 1);
-      newList.splice(toIdx, 0, removed);
-      const allCards = [...data.cards];
-      newList.forEach((item, index) => {
-        const globalIdx = allCards.findIndex(c => c.id === item.id);
-        if (globalIdx !== -1) allCards[globalIdx] = { ...allCards[globalIdx], order: index };
-      });
-      onChange({ ...data, cards: allCards });
-    }
+
+    const allCards = [...data.cards];
+    const draggedIdx = allCards.findIndex(c => c.id === draggedId);
+    const targetIdx = allCards.findIndex(c => c.id === targetId);
+
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    // Simple swap of order numbers for now, more robust logic could re-index
+    const draggedOrder = allCards[draggedIdx].order;
+    allCards[draggedIdx].order = allCards[targetIdx].order;
+    allCards[targetIdx].order = draggedOrder;
+    
+    onChange({ ...data, cards: allCards });
   };
 
-  // Mobile Touch Logic
   const handleTouchStart = (e: React.TouchEvent, id: string) => {
     setDraggedId(id);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!draggedId) return;
-    // 只有在拖拽手柄上触发拖动时才阻止默认事件（防止页面随手柄一起滚动）
-    if (e.cancelable) e.preventDefault();
     
     const touch = e.touches[0];
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -237,18 +276,36 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
   };
 
   const handleTouchEnd = () => {
+    // After drag, re-index to ensure order is sequential
+    const reindexed = data.cards
+      .sort((a:LinkCard, b:LinkCard) => a.order - b.order)
+      .map((card: LinkCard, index: number) => ({ ...card, order: index }));
+    onChange({ ...data, cards: reindexed });
     setDraggedId(null);
   };
 
   const openEdit = (card: LinkCard) => { setEditingCard(card); setIsModalOpen(true); };
+  
   const save = () => {
     if (!editingCard.title || !editingCard.url) return;
-    const cards = [...data.cards];
+    let cards = [...data.cards];
     const idx = cards.findIndex(c => c.id === editingCard.id);
-    if (idx >= 0) cards[idx] = editingCard as LinkCard;
-    else cards.push(editingCard as LinkCard);
+    
+    if (idx >= 0) {
+      cards[idx] = editingCard as LinkCard;
+    } else {
+      // Ensure new card gets a valid order number
+      const maxOrder = Math.max(...cards.map(c => c.order), -1);
+      cards.push({ ...editingCard, order: maxOrder + 1 } as LinkCard);
+    }
     onChange({ ...data, cards });
     setIsModalOpen(false);
+  };
+  
+  const handleDelete = (id: string) => {
+    confirm('删除卡片', '您确定要删除这张卡片吗？', () => {
+      onChange({ ...data, cards: data.cards.filter((c: LinkCard) => c.id !== id) });
+    }, 'danger');
   };
 
   return (
@@ -260,7 +317,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
           onChange={setFilterCat} 
           className="w-auto min-w-[120px] max-w-[50%]" 
         />
-        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', order:data.cards.length, url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10 shrink-0"><Plus size={20}/></Button>
+        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10 shrink-0"><Plus size={20}/></Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
@@ -275,7 +332,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
             <div 
               draggable 
               onDragStart={()=>onDragStart(card.id)} 
-              onDragEnd={()=>setDraggedId(null)}
+              onDragEnd={handleTouchEnd}
               onTouchStart={(e) => handleTouchStart(e, card.id)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -288,6 +345,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
                 src={card.icon} 
                 className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
                 onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64` } catch {} }}
+                alt=""
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -300,18 +358,18 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
             
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">
               <button onClick={()=>openEdit(card)} className="p-1.5 hover:bg-stone-100 rounded-md text-stone-500 hover:text-stone-800"><Edit2 size={12}/></button>
-              <button onClick={()=>confirm('删除','确定吗？',()=>onChange({...data, cards:data.cards.filter((x:any)=>x.id!==card.id)}),'danger')} className="p-1.5 hover:bg-red-50 rounded-md text-stone-500 hover:text-red-500"><Trash2 size={12}/></button>
+              <button onClick={()=>handleDelete(card.id)} className="p-1.5 hover:bg-red-50 rounded-md text-stone-500 hover:text-red-500"><Trash2 size={12}/></button>
             </div>
           </div>
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} title="编辑项目">
+      <Modal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} title={editingCard.id?.startsWith('card_') ? "编辑项目" : "新增项目"}>
         <div className="space-y-4">
           <Input label="显示名称" value={editingCard.title||''} onChange={e=>setEditingCard({...editingCard, title:e.target.value})} />
           <Input label="目标 URL" value={editingCard.url||''} onChange={e=>setEditingCard({...editingCard, url:e.target.value})} />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="图标 (可选)" value={editingCard.icon||''} onChange={e=>setEditingCard({...editingCard, icon:e.target.value})} />
+            <Input label="图标 (可选)" placeholder="留空自动获取" value={editingCard.icon||''} onChange={e=>setEditingCard({...editingCard, icon:e.target.value})} />
             <Select label="所属分类" value={editingCard.categoryId||''} onChange={v=>setEditingCard({...editingCard, categoryId:v})} options={data.categories.map((c:any)=>({value:c.id, label:c.name}))} />
           </div>
           <div className="space-y-2">
