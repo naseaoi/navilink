@@ -327,7 +327,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
             data-card-id={card.id}
             onDragOver={e=>e.preventDefault()} 
             onDragEnter={()=>onDragEnter(card.id)} 
-            className={`group relative bg-white pl-5 pr-7 py-6 rounded-2xl border border-stone-200 flex items-center gap-4 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
+            className={`group relative bg-white pl-5 pr-8 py-6 rounded-2xl border border-stone-200 flex items-center gap-5 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
           >
             <div 
               draggable 
@@ -336,7 +336,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               onTouchStart={(e) => handleTouchStart(e, card.id)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="cursor-grab active:cursor-grabbing p-1 -ml-3.5 text-stone-300 hover:text-stone-500 touch-none shrink-0"
+              className="cursor-grab active:cursor-grabbing p-1 -ml-4 text-stone-300 hover:text-stone-500 touch-none shrink-0"
             >
               <GripVertical size={14} />
             </div>
@@ -344,7 +344,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               <img 
                 src={card.icon} 
                 className="w-9 h-9 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
-                onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64` } catch {} }}
+                onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` } catch {} }}
                 alt=""
               />
             </div>
