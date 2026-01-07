@@ -72,7 +72,7 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
   }, []);
 
   return (
-    <div className={`relative w-full ${className}`} ref={containerRef}>
+    <div className={`relative ${className}`} ref={containerRef}>
       {label && <label className="mb-2 block text-sm font-medium text-stone-600 dark:text-stone-400">{label}</label>}
       <button
         type="button"
@@ -80,17 +80,17 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
         className="flex h-11 w-full items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm transition-all hover:border-stone-300 dark:bg-stone-950 dark:border-stone-800 dark:text-stone-100"
       >
         <span className="truncate font-medium">{selectedOption?.label || 'Select...'}</span>
-        <ChevronDown size={16} className={`text-stone-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} className={`text-stone-400 transition-transform duration-200 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       
       {isOpen && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-60 overflow-y-auto rounded-lg border border-stone-200 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 dark:bg-stone-900 dark:border-stone-800">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-60 overflow-y-auto rounded-lg border border-stone-200 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 dark:bg-stone-900 dark:border-stone-800 min-w-full w-max">
           {options.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => { onChange(opt.value); setIsOpen(false); }}
-              className={`flex w-full items-center px-4 py-3 text-sm font-medium transition-colors ${
+              className={`flex w-full items-center px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
                 value === opt.value ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100' : 'text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-800'
               }`}
             >

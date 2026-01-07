@@ -174,7 +174,6 @@ const CategoriesTab = ({ data, onChange, confirm }: any) => {
         <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">分类列表</span>
         <Button variant="secondary" size="sm" onClick={add}><Plus size={16}/> 新增</Button>
       </div>
-      {/* Changed to grid-cols-2 */}
       <div className="grid grid-cols-2 gap-3">
         {data.categories.map((c:any) => (
           <div key={c.id} className="flex items-center gap-3 p-4 bg-white rounded-xl border border-stone-200 dark:bg-stone-900 dark:border-stone-800">
@@ -227,33 +226,42 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <Select 
           options={[{value:'all', label:'所有卡片'}, ...data.categories.map((c:any)=>({value:c.id, label:c.name}))]} 
           value={filterCat} 
           onChange={setFilterCat} 
-          className="w-full md:w-fit md:min-w-[150px]" 
+          className="w-auto min-w-[120px] max-w-[50%]" 
         />
-        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', order:data.cards.length, url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10"><Plus size={20}/></Button>
+        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', order:data.cards.length, url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10 shrink-0"><Plus size={20}/></Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {sorted.map(card => (
           <div 
-            key={card.id} draggable onDragStart={()=>onDragStart(card.id)} onDragOver={e=>e.preventDefault()} onDragEnter={()=>onDragEnter(card.id)} onDragEnd={()=>setDraggedId(null)}
-            className={`group relative bg-white p-4 rounded-xl border border-stone-200 flex items-center gap-3 transition-all cursor-grab active:cursor-grabbing hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
+            key={card.id} 
+            onDragOver={e=>e.preventDefault()} 
+            onDragEnter={()=>onDragEnter(card.id)} 
+            className={`group relative bg-white pl-2 pr-3 py-3 rounded-xl border border-stone-200 flex items-center gap-2 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
           >
-            <GripVertical size={16} className="text-stone-300 shrink-0" />
+            <div 
+              draggable 
+              onDragStart={()=>onDragStart(card.id)} 
+              onDragEnd={()=>setDraggedId(null)}
+              className="cursor-grab active:cursor-grabbing p-1 text-stone-300 hover:text-stone-500 touch-none"
+            >
+              <GripVertical size={16} />
+            </div>
             <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800">
               <img src={card.icon} className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" onError={e=>(e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}/>
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
               <h4 className="font-bold text-sm text-stone-800 dark:text-stone-200 leading-tight break-all">{card.title}</h4>
-              {card.description && <p className="text-[10px] text-stone-400 line-clamp-1 leading-relaxed">{card.description}</p>}
+              {card.description && <p className="text-[10px] text-stone-400 line-clamp-1 leading-tight">{card.description}</p>}
               <p className="text-[10px] text-stone-300 font-mono truncate">{new URL(card.url).hostname}</p>
             </div>
             
-            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">
               <button onClick={()=>openEdit(card)} className="p-1.5 hover:bg-stone-100 rounded-md text-stone-500 hover:text-stone-800"><Edit2 size={12}/></button>
               <button onClick={()=>confirm('删除','确定吗？',()=>onChange({...data, cards:data.cards.filter((x:any)=>x.id!==card.id)}),'danger')} className="p-1.5 hover:bg-red-50 rounded-md text-stone-500 hover:text-red-500"><Trash2 size={12}/></button>
             </div>
