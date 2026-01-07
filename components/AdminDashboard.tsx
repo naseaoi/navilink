@@ -118,7 +118,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
             </h2>
           </div>
           <Button onClick={handleSave} disabled={!hasChanges} isLoading={isSaving} size="lg" className="px-8 shadow-xl shadow-indigo-600/10">
-            <Save size={18} className="mr-2" /> 保存更改
+            <Save size={18} className="mr-2" /> 保存
           </Button>
         </header>
 
@@ -305,19 +305,6 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
     onChange({ ...data, cards: updatedCards });
   };
 
-  const moveCard = (id: string, direction: 'up' | 'down') => {
-    const index = sortedCards.findIndex(c => c.id === id);
-    if (index === -1) return;
-
-    const newList = [...sortedCards];
-    if (direction === 'up' && index > 0) {
-      [newList[index - 1], newList[index]] = [newList[index], newList[index - 1]];
-    } else if (direction === 'down' && index < newList.length - 1) {
-      [newList[index], newList[index + 1]] = [newList[index + 1], newList[index]];
-    }
-    updateCardOrder(newList);
-  };
-
   // Drag and Drop Handlers
   const onDragStart = (id: string) => {
     setDraggedId(id);
@@ -370,57 +357,61 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
       <div className="flex items-center justify-between gap-6">
-        <Select 
-          value={filterCat}
-          onChange={(e) => setFilterCat(e.target.value)}
-          className="w-full md:w-80 shadow-sm"
-        >
-          <option value="all">显示所有卡片 (全部分类)</option>
-          {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
+        <div className="relative flex-1 md:flex-none md:w-80">
+          <Select 
+            value={filterCat}
+            onChange={(e) => setFilterCat(e.target.value)}
+            className="w-full bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl py-2 pl-4 pr-10 text-sm focus:ring-4 focus:ring-indigo-500/5 transition-all appearance-none"
+          >
+            <option value="all">显示所有卡片</option>
+            {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </div>
         <Button onClick={openNew} size="icon" className="shadow-lg shadow-indigo-600/20 shrink-0">
           <Plus size={24} />
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
-        {sortedCards.map((card, idx) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5 gap-4">
+        {sortedCards.map((card) => (
           <div 
             key={card.id} 
             draggable
             onDragStart={() => onDragStart(card.id)}
             onDragOver={onDragOver}
             onDrop={() => onDrop(card.id)}
-            className={`bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-5 hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-500/5 transition-all dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500 group cursor-grab active:cursor-grabbing ${draggedId === card.id ? 'opacity-30 border-indigo-500 scale-95' : ''}`}
+            className={`bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3.5 hover:border-indigo-400 hover:shadow-lg transition-all dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500 group cursor-grab active:cursor-grabbing ${draggedId === card.id ? 'opacity-30 border-indigo-500 scale-95' : ''}`}
           >
-            <div className="flex flex-col gap-1 pr-2 border-r border-slate-100 dark:border-slate-800">
-              <button onClick={(e) => { e.stopPropagation(); moveCard(card.id, 'up'); }} disabled={idx === 0} className="p-1 hover:bg-slate-100 rounded-lg text-slate-300 hover:text-indigo-600 disabled:opacity-10 transition-all"><ArrowUp size={16}/></button>
-              <button onClick={(e) => { e.stopPropagation(); moveCard(card.id, 'down'); }} disabled={idx === sortedCards.length - 1} className="p-1 hover:bg-slate-100 rounded-lg text-slate-300 hover:text-indigo-600 disabled:opacity-10 transition-all"><ArrowDown size={16}/></button>
+            <div className="shrink-0 text-slate-300 dark:text-slate-700 group-hover:text-indigo-400 transition-colors">
+              <GripVertical size={18} strokeWidth={2.5} />
             </div>
-            <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-xl flex items-center justify-center overflow-hidden border border-slate-100 dark:bg-slate-800 dark:border-slate-700 pointer-events-none">
+            
+            <div className="w-12 h-12 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center overflow-hidden border border-slate-100 dark:bg-slate-800 dark:border-slate-700 pointer-events-none">
                <img 
                 src={card.icon || `https://www.google.com/s2/favicons?domain=${new URL(card.url || 'https://google.com').hostname}&sz=128`} 
-                className="w-10 h-10 object-contain" 
+                className="w-8 h-8 object-contain" 
                 alt="" 
                 onError={(e) => {(e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}} 
               />
             </div>
+            
             <div className="flex-1 min-w-0 pointer-events-none">
-              <h4 className="font-bold text-slate-900 truncate dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{card.title}</h4>
-              <p className="text-[11px] text-slate-400 truncate mt-1 font-mono tracking-tighter">{card.url}</p>
-              <div className="mt-2.5">
-                 <span className="text-[10px] px-2.5 py-0.5 bg-slate-50 text-slate-500 rounded-lg font-black uppercase tracking-widest border border-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+              <h4 className="font-bold text-sm text-slate-900 truncate dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{card.title}</h4>
+              <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono tracking-tighter opacity-70">{card.url}</p>
+              <div className="mt-1.5">
+                 <span className="text-[9px] px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md font-black uppercase tracking-widest border border-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                    {data.categories.find(c => c.id === card.categoryId)?.name || '未分类'}
                  </span>
               </div>
             </div>
-            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-              <button onClick={(e) => { e.stopPropagation(); openEdit(card); }} className="p-3 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={18}/></button>
-              <button onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }} className="p-3 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={18}/></button>
+            
+            <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+              <button onClick={(e) => { e.stopPropagation(); openEdit(card); }} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={16}/></button>
+              <button onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={16}/></button>
             </div>
           </div>
         ))}
-        {sortedCards.length === 0 && <div className="text-center text-slate-400 py-20 border-2 border-dashed border-slate-200 rounded-2xl col-span-full dark:border-slate-800 font-bold">暂无内容，点击右上角加号添加</div>}
+        {sortedCards.length === 0 && <div className="text-center text-slate-400 py-16 border-2 border-dashed border-slate-200 rounded-xl col-span-full dark:border-slate-800 font-bold">暂无内容</div>}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCard.id?.includes('new') ? "新建导航" : "编辑卡片"}>
