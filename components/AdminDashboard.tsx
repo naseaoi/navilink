@@ -253,12 +253,18 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               <GripVertical size={16} />
             </div>
             <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800">
-              <img src={card.icon} className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" onError={e=>(e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}/>
+              <img 
+                src={card.icon} 
+                className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
+                onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64` } catch {} }}
+              />
             </div>
             <div className="flex-1 min-w-0 flex flex-col gap-0.5">
               <h4 className="font-bold text-sm text-stone-800 dark:text-stone-200 leading-tight break-all">{card.title}</h4>
               {card.description && <p className="text-[10px] text-stone-400 line-clamp-1 leading-tight">{card.description}</p>}
-              <p className="text-[10px] text-stone-300 font-mono truncate">{new URL(card.url).hostname}</p>
+              <p className="text-[10px] text-stone-300 font-mono truncate">
+                {(() => { try { return new URL(card.url).hostname } catch { return card.url } })()}
+              </p>
             </div>
             
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">

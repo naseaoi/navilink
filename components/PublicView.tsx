@@ -231,7 +231,7 @@ const CardItem: React.FC<{ card: LinkCard; onClick: () => void; style?: React.CS
         <img 
           src={card.icon} 
           className="w-7 h-7 object-contain opacity-90 group-hover:opacity-100"
-          onError={e => { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` }}
+          onError={e => { try { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` } catch {} }}
         />
       </div>
       <ArrowUpRight size={18} className="text-stone-300 group-hover:text-stone-800 dark:group-hover:text-stone-200 transition-colors" />
