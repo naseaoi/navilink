@@ -1,16 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PublicData, LinkCard } from '../types';
-import { Search, Compass, ArrowUpRight } from 'lucide-react';
+import { Search, Compass, ArrowUpRight, Shield, Clock } from 'lucide-react';
 import { Modal, Button } from './UI';
+import { useNavigate } from 'react-router-dom';
 
 interface PublicViewProps {
   data: PublicData;
 }
 
 export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmUrl, setConfirmUrl] = useState<string | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const filteredCards = useMemo(() => {
     let cards = data.cards;
@@ -23,83 +32,99 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
   }, [data.cards, selectedCategory, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 dark:bg-[#020617] dark:text-slate-100 transition-colors duration-500 font-sans selection:bg-indigo-500/20">
-      {/* Mesh Gradient Background */}
+    <div className="min-h-screen bg-[#fcfdfe] text-slate-900 dark:bg-[#020617] dark:text-slate-100 transition-colors duration-500 font-sans selection:bg-indigo-500/10">
+      {/* 2025 Mesh Gradient Layer */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-500/5 blur-[140px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 blur-[140px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Floating Island Header */}
-      <header className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-1.5rem)] max-w-5xl">
-        <div className="bg-white/60 backdrop-blur-2xl border border-white/40 shadow-[0_4px_24px_rgba(0,0,0,0.04)] rounded-3xl px-4 py-2.5 flex items-center justify-between gap-3 dark:bg-slate-900/60 dark:border-white/10">
-          <div className="flex items-center gap-2.5 shrink-0 pl-2">
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-              {data.settings.icon ? (
-                data.settings.icon.startsWith('http') ? <img src={data.settings.icon} className="w-5 h-5 object-contain" /> : <span className="text-lg">{data.settings.icon}</span>
-              ) : <Compass size={20} />}
+      {/* Top Status Bar (Minimal) */}
+      <div className={`fixed top-0 left-0 right-0 z-[70] transition-all duration-300 ${scrolled ? 'py-3' : 'py-6'}`}>
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+            <div className="w-8 h-8 bg-slate-900 dark:bg-white rounded-lg flex items-center justify-center text-white dark:text-slate-900 transition-transform group-hover:rotate-12">
+              {data.settings.icon && !data.settings.icon.startsWith('http') ? (
+                <span className="text-sm font-bold">{data.settings.icon}</span>
+              ) : <Compass size={16} />}
             </div>
-            <span className="font-black text-base tracking-tighter hidden sm:block bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
-              {data.settings.title}
-            </span>
+            <span className="font-black text-sm tracking-tighter uppercase">{data.settings.title}</span>
           </div>
-
-          <div className="flex-1 max-w-sm relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-            <input 
-              className="w-full bg-slate-200/30 border-none rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-4 focus:ring-indigo-500/10 transition-all dark:bg-slate-800/50 dark:placeholder:text-slate-500"
-              placeholder="搜索资源..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
+          
+          <div className="hidden sm:flex items-center gap-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <div className="flex items-center gap-2"><Clock size={12}/> {new Date().toLocaleDateString('zh-CN', {month: 'long', day: 'numeric'})}</div>
+            <button onClick={() => navigate('/tat')} className="hover:text-indigo-600 transition-colors flex items-center gap-1.5"><Shield size={12}/> Portal</button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Category Navigation - Minimal & Clean */}
-      <nav className="pt-24 pb-6 px-4 flex justify-start sm:justify-center overflow-x-auto no-scrollbar gap-2 z-10 relative">
-        <CategoryPill active={selectedCategory === 'all'} onClick={() => setSelectedCategory('all')} label="全部分类" />
-        {data.categories.sort((a,b) => a.order - b.order).map(cat => (
-          <CategoryPill key={cat.id} active={selectedCategory === cat.id} onClick={() => setSelectedCategory(cat.id)} label={cat.name} />
-        ))}
-      </nav>
+      {/* Hero Content: Spotlight Search */}
+      <section className="relative pt-32 pb-12 px-6 flex flex-col items-center">
+        <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-700">
+           {/* The "Spotlight" Input */}
+           <div className="relative group">
+              <div className="absolute inset-0 bg-indigo-500/10 blur-2xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
+              <div className="relative flex items-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl border border-slate-200 dark:border-white/10 rounded-[1.5rem] shadow-xl shadow-slate-200/20 dark:shadow-none overflow-hidden transition-all group-focus-within:ring-1 group-focus-within:ring-indigo-500/50">
+                <Search className="ml-5 text-slate-400" size={20} />
+                <input 
+                  className="flex-1 bg-transparent border-none px-4 py-5 text-base sm:text-lg focus:ring-0 placeholder:text-slate-400 font-medium"
+                  placeholder="搜索资源、文档或工具..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+                <div className="hidden sm:flex items-center gap-1 mr-5">
+                   <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-[10px] font-black text-slate-400 border border-slate-200 dark:border-white/5">⌘</kbd>
+                   <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-[10px] font-black text-slate-400 border border-slate-200 dark:border-white/5">K</kbd>
+                </div>
+              </div>
+           </div>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 pb-24 z-10 relative">
-        {/* Mobile 2-column, Desktop responsive grid */}
+           {/* Quick Dock Categories */}
+           <div className="mt-8 flex justify-center">
+             <div className="flex flex-wrap justify-center gap-1.5 p-1.5 bg-slate-100/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-white/5">
+                <CategoryPill active={selectedCategory === 'all'} onClick={() => setSelectedCategory('all')} label="全部" />
+                {data.categories.sort((a,b) => a.order - b.order).map(cat => (
+                  <CategoryPill key={cat.id} active={selectedCategory === cat.id} onClick={() => setSelectedCategory(cat.id)} label={cat.name} />
+                ))}
+             </div>
+           </div>
+        </div>
+      </section>
+
+      {/* Grid Content */}
+      <main className="max-w-7xl mx-auto px-4 pb-32 animate-in fade-in duration-1000">
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6">
           {filteredCards.map(card => (
             <CardItem key={card.id} card={card} onClick={() => setConfirmUrl(card.url)} />
           ))}
           {filteredCards.length === 0 && (
-            <div className="col-span-full py-24 text-center">
-              <div className="text-slate-300 dark:text-slate-700 font-black text-4xl mb-2">404</div>
-              <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">没有找到相关资源</div>
+            <div className="col-span-full py-32 flex flex-col items-center justify-center text-slate-300">
+              <Search size={48} className="mb-4 opacity-20" />
+              <div className="text-xs font-black uppercase tracking-widest opacity-40">找不到任何线索</div>
             </div>
           )}
         </div>
       </main>
 
-      {/* Exit Modal */}
-      <Modal isOpen={!!confirmUrl} onClose={() => setConfirmUrl(null)} title="跳转确认">
+      <Modal isOpen={!!confirmUrl} onClose={() => setConfirmUrl(null)} title="即刻启程">
         <div className="space-y-4">
-          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">即将离开站点</p>
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-[10px] font-mono text-indigo-600 break-all dark:bg-slate-950 dark:border-slate-800">
+          <div className="p-5 bg-slate-50 dark:bg-slate-950 rounded-3xl border border-slate-100 dark:border-white/5 text-[10px] font-mono text-indigo-600 break-all leading-relaxed">
             {confirmUrl}
           </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" className="flex-1 text-xs" onClick={() => setConfirmUrl(null)}>取消</Button>
-            <Button className="flex-1 text-xs" onClick={() => { window.open(confirmUrl!, '_blank'); setConfirmUrl(null); }}>
-              前往 <ArrowUpRight className="ml-1" size={14} />
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => setConfirmUrl(null)}>再等等</Button>
+            <Button className="flex-1" onClick={() => { window.open(confirmUrl!, '_blank'); setConfirmUrl(null); }}>
+              立即出发 <ArrowUpRight className="ml-1" size={14} />
             </Button>
           </div>
         </div>
       </Modal>
 
-      <footer className="py-12 text-center opacity-40">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-          Powered by NaviLink • 2025 Edition
-        </p>
+      <footer className="py-24 text-center">
+        <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-slate-100 dark:bg-slate-900 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+          Systems Operational • 2025
+        </div>
       </footer>
     </div>
   );
@@ -108,10 +133,10 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
 const CategoryPill: React.FC<{ active: boolean; label: string; onClick: () => void }> = ({ active, label, onClick }) => (
   <button 
     onClick={onClick}
-    className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all border shrink-0 ${
+    className={`px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border shrink-0 ${
       active 
-        ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950 dark:border-white' 
-        : 'bg-white/40 text-slate-500 border-white hover:border-slate-200 dark:bg-slate-900/40 dark:text-slate-400 dark:border-white/5'
+        ? 'bg-white text-slate-900 border-slate-200 shadow-sm dark:bg-white dark:text-slate-900 dark:border-white' 
+        : 'bg-transparent text-slate-500 border-transparent hover:bg-white/50 dark:hover:bg-white/5'
     }`}
   >
     {label}
@@ -121,34 +146,31 @@ const CategoryPill: React.FC<{ active: boolean; label: string; onClick: () => vo
 const CardItem: React.FC<{ card: LinkCard; onClick: () => void }> = ({ card, onClick }) => (
   <div 
     onClick={onClick}
-    className="group relative bg-white/50 backdrop-blur-md p-4 sm:p-6 rounded-3xl border border-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] hover:-translate-y-1.5 hover:border-indigo-400/30 transition-all duration-500 cursor-pointer overflow-hidden dark:bg-slate-900/50 dark:border-white/5 dark:hover:border-indigo-500/30"
+    className="group relative bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-4 sm:p-6 rounded-[2rem] border border-slate-100 dark:border-white/5 hover:border-indigo-500/30 hover:-translate-y-1.5 transition-all duration-500 cursor-pointer overflow-hidden shadow-sm shadow-slate-200/5 hover:shadow-2xl hover:shadow-indigo-500/5"
   >
-    {/* Subtle gloss effect on hover */}
-    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full" />
+    {/* Dynamic gloss flare */}
+    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent pointer-events-none" />
     
-    <div className="relative flex flex-col gap-3 sm:gap-4">
-      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center border border-slate-50 shadow-sm dark:bg-slate-800 dark:border-slate-700 shrink-0">
+    <div className="relative flex flex-col h-full gap-4">
+      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-50 dark:border-white/5 transition-transform duration-500 group-hover:rotate-[10deg]">
         <img 
           src={card.icon} 
-          className="w-7 h-7 sm:w-8 sm:h-8 object-contain transition-transform duration-500 group-hover:scale-110"
+          className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
           onError={e => { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` }}
         />
       </div>
       
-      <div className="min-w-0">
-        <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+      <div className="flex-1">
+        <h3 className="font-black text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
           {card.title}
         </h3>
-        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-1 sm:line-clamp-2 mt-1 font-medium leading-tight">
-          {card.description || '探索更多精彩内容'}
+        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 font-medium leading-relaxed opacity-80">
+          {card.description || '探索数字宇宙的更多可能'}
         </p>
       </div>
 
-      <div className="flex justify-between items-center mt-auto pt-1 sm:pt-2">
-         <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-400 uppercase tracking-tighter dark:bg-slate-800 dark:text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-400 transition-colors">
-           Secure Link
-         </span>
-         <ArrowUpRight size={14} className="text-slate-200 group-hover:text-indigo-500 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      <div className="flex justify-end opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-500">
+         <ArrowUpRight size={14} className="text-indigo-500" />
       </div>
     </div>
   </div>
