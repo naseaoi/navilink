@@ -233,9 +233,18 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
   const [editingCard, setEditingCard] = useState<Partial<LinkCard>>({});
   const [filterCat, setFilterCat] = useState('all');
   const [draggedId, setDraggedId] = useState<string|null>(null);
+  // 新增：用于跟踪当前移动端展开菜单的卡片 ID
+  const [activeMenuId, setActiveMenuId] = useState<string|null>(null);
 
   const filtered = filterCat === 'all' ? data.cards : data.cards.filter((c:any) => c.categoryId === filterCat);
   const sorted = [...filtered].sort((a,b) => a.order - b.order);
+
+  // 全局点击监听以关闭已展开的菜单
+  useEffect(() => {
+    const handleGlobalClick = () => setActiveMenuId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   const onDragStart = (id: string) => setDraggedId(id);
   
@@ -324,9 +333,15 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
             data-card-id={card.id}
             onDragOver={e=>e.preventDefault()} 
             onDragEnter={()=>onDragEnter(card.id)} 
-            className={`group relative bg-white pl-3 pr-10 py-5 rounded-2xl border border-stone-200 flex items-center gap-4 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
+            // 改进：点击卡片显示/隐藏菜单
+            onClick={(e) => {
+              e.stopPropagation();
+              if (draggedId) return;
+              setActiveMenuId(activeMenuId === card.id ? null : card.id);
+            }}
+            className={`group relative bg-white pl-3 pr-10 py-5 rounded-2xl border border-stone-200 flex items-center gap-4 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''} ${activeMenuId === card.id ? 'border-stone-400 shadow-md ring-2 ring-stone-900/5' : ''}`}
           >
-            {/* 拖拽图标：更小、占比更低 */}
+            {/* 拖拽图标 */}
             <div 
               draggable 
               onDragStart={()=>onDragStart(card.id)} 
@@ -334,12 +349,14 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               onTouchStart={(e) => handleTouchStart(e, card.id)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
+              // 阻止点击冒泡以免触发 activeMenuId 切换
+              onClick={(e) => e.stopPropagation()}
               className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-stone-300 hover:text-stone-500 touch-none shrink-0"
             >
               <GripVertical size={12} />
             </div>
 
-            {/* Icon：保持清晰度，调整间距 */}
+            {/* Icon */}
             <div className="w-16 h-16 shrink-0 bg-stone-50 rounded-xl flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800 group-hover:scale-105 transition-transform duration-300">
               <img 
                 src={card.icon} 
@@ -349,7 +366,7 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               />
             </div>
 
-            {/* 文字内容：充分利用拉长的宽度 */}
+            {/* 文字内容 */}
             <div className="flex-1 min-w-0 flex flex-col gap-1.5 overflow-hidden">
               <h4 className="font-bold text-xl text-stone-800 dark:text-stone-200 leading-tight truncate">{card.title}</h4>
               {card.description && <p className="text-sm text-stone-400 truncate leading-tight">{card.description}</p>}
@@ -358,10 +375,24 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               </p>
             </div>
             
-            {/* 操作按钮：悬浮显示 */}
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/95 dark:bg-stone-900/95 backdrop-blur-sm p-1.5 rounded-xl shadow-lg border border-stone-100 dark:border-stone-800">
-              <button onClick={()=>openEdit(card)} className="p-2.5 hover:bg-stone-100 rounded-lg text-stone-500 hover:text-stone-800 dark:hover:bg-stone-800"><Edit2 size={16}/></button>
-              <button onClick={()=>handleDelete(card.id)} className="p-2.5 hover:bg-red-50 rounded-lg text-stone-500 hover:text-red-500 dark:hover:bg-red-950/30"><Trash2 size={16}/></button>
+            {/* 操作按钮：增加状态控制以适配移动端 */}
+            <div 
+              className={`absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 transition-all bg-white/95 dark:bg-stone-900/95 backdrop-blur-sm p-1.5 rounded-xl shadow-lg border border-stone-100 dark:border-stone-800 ${activeMenuId === card.id ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:scale-100 group-hover:visible'}`}
+              // 阻止内部按钮点击冒泡到卡片上
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button 
+                onClick={(e)=>{ e.stopPropagation(); openEdit(card); }} 
+                className="p-2.5 hover:bg-stone-100 rounded-lg text-stone-500 hover:text-stone-800 dark:hover:bg-stone-800"
+              >
+                <Edit2 size={16}/>
+              </button>
+              <button 
+                onClick={(e)=>{ e.stopPropagation(); handleDelete(card.id); }} 
+                className="p-2.5 hover:bg-red-50 rounded-lg text-stone-500 hover:text-red-500 dark:hover:bg-red-950/30"
+              >
+                <Trash2 size={16}/>
+              </button>
             </div>
           </div>
         ))}
