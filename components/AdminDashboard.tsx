@@ -84,7 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   );
 
   return (
-    <div className="fixed inset-0 flex flex-col md:flex-row bg-[#fafaf9] dark:bg-[#1c1917] overflow-hidden font-sans text-stone-800 dark:text-stone-200">
+    <div className="fixed inset-0 h-[100dvh] flex flex-col md:flex-row bg-[#fafaf9] dark:bg-[#1c1917] overflow-hidden font-sans text-stone-800 dark:text-stone-200">
       <ToastContainer messages={toasts} onRemove={removeToast} />
       <ConfirmModal 
         isOpen={confirmConfig.isOpen} onClose={() => setConfirmConfig(p=>({...p, isOpen: false}))} 
@@ -130,7 +130,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           </Button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar overscroll-contain">
+        {/* Added min-h-0 to allow flex container to shrink and scroll properly */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar">
            <div className="max-w-6xl mx-auto space-y-8 pb-32">
               {activeTab === 'settings' && <SettingsTab dataP={localPublic} dataV={localPrivate} onP={d=>{setLocalPublic(d); markChanged();}} onV={d=>{setLocalPrivate(d); markChanged();}} />}
               {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
@@ -220,6 +221,9 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!draggedId) return;
+    // Critical: Prevent default scroll behavior while dragging
+    if (e.cancelable) e.preventDefault();
+    
     const touch = e.touches[0];
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
     const cardEl = target?.closest('[data-card-id]');
