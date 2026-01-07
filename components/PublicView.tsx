@@ -14,6 +14,13 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
   const [confirmUrl, setConfirmUrl] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Sync Document Title
+  useEffect(() => {
+    if (data.settings.title) {
+      document.title = data.settings.title;
+    }
+  }, [data.settings.title]);
+
   // Focus input when search opens
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {

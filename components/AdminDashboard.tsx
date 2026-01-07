@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PublicData, PrivateData, LinkCard, Category } from '../types';
 import { webdav } from '../services/webdavService';
 import { Button, Input, Select, Modal, Card, PasswordInput, ToastContainer, ToastMessage, ToastType, ConfirmModal } from './UI';
-import { Settings, Layout, Layers, LogOut, Plus, Trash2, Edit2, GripVertical, Save, Shield, Home } from 'lucide-react';
+import { Settings, Layout, Layers, LogOut, Plus, Trash2, Edit2, GripVertical, Save, Shield, Home, Menu, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminDashboardProps {
@@ -22,6 +22,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   const [localPublic, setLocalPublic] = useState<PublicData>(publicData);
   const [localPrivate, setLocalPrivate] = useState<PrivateData>(privateData);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
@@ -52,6 +53,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
 
   const markChanged = () => setHasChanges(true);
 
+  // Sidebar Content
+  const SidebarContent = () => (
+    <>
+      <div className="p-8 border-b border-white/5 flex items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-900 shadow-lg shadow-black/20 shrink-0">
+          <Shield size={20} />
+        </div>
+        <div>
+          <span className="font-serif font-bold text-stone-100 block text-lg leading-tight tracking-tight">NaviLink</span>
+          <span className="text-[10px] uppercase tracking-widest text-stone-500 font-medium">Admin Panel</span>
+        </div>
+      </div>
+      
+      <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
+        <NavButton active={activeTab === 'cards'} onClick={() => {setActiveTab('cards'); setIsMobileMenuOpen(false);}} icon={<Layout size={18} />} label="卡片管理" />
+        <NavButton active={activeTab === 'categories'} onClick={() => {setActiveTab('categories'); setIsMobileMenuOpen(false);}} icon={<Layers size={18} />} label="分类管理" />
+        <NavButton active={activeTab === 'settings'} onClick={() => {setActiveTab('settings'); setIsMobileMenuOpen(false);}} icon={<Settings size={18} />} label="网站设置" />
+      </nav>
+
+      <div className="p-6 border-t border-white/5 space-y-3">
+        <Button variant="ghost" className="w-full justify-start py-3 h-auto text-stone-400 hover:text-stone-100 hover:bg-white/5" onClick={() => navigate('/')}>
+          <Home size={18} className="mr-3" /> 返回首页
+        </Button>
+        <Button variant="ghost" className="w-full justify-start py-3 h-auto text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={onLogout}>
+          <LogOut size={18} className="mr-3" /> 退出登录
+        </Button>
+      </div>
+    </>
+  );
+
   return (
     <div className="fixed inset-0 flex flex-col md:flex-row bg-[#fafaf9] dark:bg-[#1c1917] overflow-hidden font-sans text-stone-800 dark:text-stone-200">
       <ToastContainer messages={toasts} onRemove={removeToast} />
@@ -60,44 +91,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         onConfirm={confirmConfig.onConfirm} title={confirmConfig.title} message={confirmConfig.message} variant={confirmConfig.variant}
       />
 
+      {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-72 bg-[#292524] text-stone-400 flex-col flex-shrink-0 z-30 dark:bg-[#0c0a09] dark:border-r dark:border-stone-800">
-        <div className="p-8 border-b border-white/5 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-900 shadow-lg shadow-black/20">
-            <Shield size={20} />
-          </div>
-          <div>
-            <span className="font-serif font-bold text-stone-100 block text-lg leading-tight tracking-tight">NaviLink</span>
-            <span className="text-[10px] uppercase tracking-widest text-stone-500 font-medium">Admin Panel</span>
-          </div>
-        </div>
-        
-        <nav className="flex-1 p-6 space-y-2">
-          <NavButton active={activeTab === 'cards'} onClick={() => setActiveTab('cards')} icon={<Layout size={18} />} label="卡片管理" />
-          <NavButton active={activeTab === 'categories'} onClick={() => setActiveTab('categories')} icon={<Layers size={18} />} label="分类管理" />
-          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={18} />} label="网站设置" />
-        </nav>
-
-        <div className="p-6 border-t border-white/5 space-y-3">
-          <Button variant="ghost" className="w-full justify-start py-3 h-auto text-stone-400 hover:text-stone-100 hover:bg-white/5" onClick={() => navigate('/')}>
-            <Home size={18} className="mr-3" /> 返回首页
-          </Button>
-          <Button variant="ghost" className="w-full justify-start py-3 h-auto text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={onLogout}>
-            <LogOut size={18} className="mr-3" /> 退出登录
-          </Button>
-        </div>
+        <SidebarContent />
       </aside>
 
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+          <aside className="relative w-72 bg-[#292524] text-stone-400 flex flex-col h-full shadow-2xl animate-in slide-in-from-left duration-300">
+             <button className="absolute top-4 right-4 p-2 text-stone-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}><X size={20}/></button>
+             <SidebarContent />
+          </aside>
+        </div>
+      )}
+
       <main className="flex-1 flex flex-col min-w-0 bg-[#fafaf9] dark:bg-[#1c1917]">
-        <header className="flex-shrink-0 flex justify-between items-center p-6 md:px-10 md:py-6 bg-[#fafaf9]/80 backdrop-blur-md border-b border-stone-200 dark:bg-[#1c1917]/80 dark:border-stone-800">
-          <h2 className="text-2xl md:text-3xl font-serif font-bold text-stone-900 dark:text-stone-100 tracking-tight">
-            {activeTab === 'cards' ? 'Cards' : activeTab === 'categories' ? 'Categories' : 'Settings'}
-          </h2>
-          <Button onClick={handleSave} disabled={!hasChanges} isLoading={isSaving} size="lg" className="px-8 shadow-xl shadow-stone-900/10">
-            <Save size={18} className="mr-2" /> 保存更改
+        <header className="flex-shrink-0 flex justify-between items-center p-4 md:px-10 md:py-6 bg-[#fafaf9]/80 backdrop-blur-md border-b border-stone-200 dark:bg-[#1c1917]/80 dark:border-stone-800">
+          <div className="flex items-center gap-3">
+             <button className="md:hidden p-2 -ml-2 text-stone-600 dark:text-stone-300" onClick={() => setIsMobileMenuOpen(true)}>
+               <Menu size={24} />
+             </button>
+             <h2 className="text-xl md:text-3xl font-serif font-bold text-stone-900 dark:text-stone-100 tracking-tight">
+              {activeTab === 'cards' ? 'Cards' : activeTab === 'categories' ? 'Categories' : 'Settings'}
+             </h2>
+          </div>
+          
+          <Button 
+            onClick={handleSave} 
+            disabled={!hasChanges} 
+            isLoading={isSaving} 
+            size="icon" 
+            className="rounded-full w-12 h-12 shadow-xl shadow-stone-900/10"
+            title="保存更改"
+          >
+            <Save size={20} />
           </Button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
            <div className="max-w-6xl mx-auto space-y-8 pb-32">
               {activeTab === 'settings' && <SettingsTab dataP={localPublic} dataV={localPrivate} onP={d=>{setLocalPublic(d); markChanged();}} onV={d=>{setLocalPrivate(d); markChanged();}} />}
               {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
@@ -140,11 +173,12 @@ const CategoriesTab = ({ data, onChange, confirm }: any) => {
         <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">分类列表</span>
         <Button variant="secondary" size="sm" onClick={add}><Plus size={16}/> 新增</Button>
       </div>
-      <div className="grid gap-3">
+      {/* Changed to grid-cols-2 */}
+      <div className="grid grid-cols-2 gap-3">
         {data.categories.map((c:any) => (
-          <div key={c.id} className="flex items-center gap-4 p-4 bg-white rounded-xl border border-stone-200 dark:bg-stone-900 dark:border-stone-800">
-            {editId === c.id ? <><div className="flex-1"><Input autoFocus value={tmp} onChange={e=>setTmp(e.target.value)} onKeyDown={e=>e.key==='Enter' && (onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}), setEditId(null))} /></div><Button size="sm" onClick={()=>{onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}); setEditId(null);}}>保存</Button></> : <span className="flex-1 font-bold text-stone-700 dark:text-stone-300">{c.name}</span>}
-            {!editId && <div className="flex gap-2"><button onClick={()=>{setEditId(c.id); setTmp(c.name);}} className="p-2 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-600 transition-colors"><Edit2 size={16}/></button><button onClick={()=>confirm('删除分类','确定删除吗？',()=>onChange({...data, categories:data.categories.filter((x:any)=>x.id!==c.id)}),'danger')} className="p-2 hover:bg-red-50 rounded-lg text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={16}/></button></div>}
+          <div key={c.id} className="flex items-center gap-3 p-4 bg-white rounded-xl border border-stone-200 dark:bg-stone-900 dark:border-stone-800">
+            {editId === c.id ? <><div className="flex-1 min-w-0"><Input autoFocus value={tmp} onChange={e=>setTmp(e.target.value)} onKeyDown={e=>e.key==='Enter' && (onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}), setEditId(null))} /></div><Button size="sm" onClick={()=>{onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}); setEditId(null);}}>保存</Button></> : <span className="flex-1 font-bold text-stone-700 dark:text-stone-300 truncate">{c.name}</span>}
+            {!editId && <div className="flex gap-1"><button onClick={()=>{setEditId(c.id); setTmp(c.name);}} className="p-2 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-600 transition-colors"><Edit2 size={16}/></button><button onClick={()=>confirm('删除分类','确定删除吗？',()=>onChange({...data, categories:data.categories.filter((x:any)=>x.id!==c.id)}),'danger')} className="p-2 hover:bg-red-50 rounded-lg text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={16}/></button></div>}
           </div>
         ))}
       </div>
@@ -194,26 +228,28 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <Select options={[{value:'all', label:'显示所有卡片'}, ...data.categories.map((c:any)=>({value:c.id, label:c.name}))]} value={filterCat} onChange={setFilterCat} className="md:w-64" />
-        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', order:data.cards.length, url:'https://'}); setIsModalOpen(true);}} size="icon"><Plus size={20}/></Button>
+        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', order:data.cards.length, url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10"><Plus size={20}/></Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {sorted.map(card => (
           <div 
             key={card.id} draggable onDragStart={()=>onDragStart(card.id)} onDragOver={e=>e.preventDefault()} onDragEnter={()=>onDragEnter(card.id)} onDragEnd={()=>setDraggedId(null)}
-            className={`group bg-white p-4 rounded-xl border border-stone-200 flex items-center gap-3 transition-all cursor-grab active:cursor-grabbing hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
+            className={`group relative bg-white p-4 rounded-xl border border-stone-200 flex items-start gap-3 transition-all cursor-grab active:cursor-grabbing hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''}`}
           >
-            <GripVertical size={16} className="text-stone-300 shrink-0" />
+            <GripVertical size={16} className="text-stone-300 shrink-0 mt-2" />
             <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800">
               <img src={card.icon} className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" onError={e=>(e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}/>
             </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-sm text-stone-800 dark:text-stone-200 truncate">{card.title}</h4>
-              <p className="text-[10px] text-stone-400 truncate font-mono mt-0.5">{new URL(card.url).hostname}</p>
+            <div className="flex-1 min-w-0 flex flex-col gap-1">
+              <h4 className="font-bold text-sm text-stone-800 dark:text-stone-200 leading-tight break-all">{card.title}</h4>
+              {card.description && <p className="text-[10px] text-stone-400 line-clamp-2 leading-relaxed">{card.description}</p>}
+              <p className="text-[10px] text-stone-300 font-mono truncate">{new URL(card.url).hostname}</p>
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
-              <button onClick={()=>openEdit(card)} className="p-1.5 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-600"><Edit2 size={14}/></button>
-              <button onClick={()=>confirm('删除','确定吗？',()=>onChange({...data, cards:data.cards.filter((x:any)=>x.id!==card.id)}),'danger')} className="p-1.5 hover:bg-red-50 rounded-lg text-stone-400 hover:text-red-500"><Trash2 size={14}/></button>
+            
+            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-stone-100 dark:border-stone-800">
+              <button onClick={()=>openEdit(card)} className="p-1.5 hover:bg-stone-100 rounded-md text-stone-500 hover:text-stone-800"><Edit2 size={12}/></button>
+              <button onClick={()=>confirm('删除','确定吗？',()=>onChange({...data, cards:data.cards.filter((x:any)=>x.id!==card.id)}),'danger')} className="p-1.5 hover:bg-red-50 rounded-md text-stone-500 hover:text-red-500"><Trash2 size={12}/></button>
             </div>
           </div>
         ))}

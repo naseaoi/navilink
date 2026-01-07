@@ -5,7 +5,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { webdav } from './services/webdavService';
 import { AppState, PrivateData } from './types';
 import { Button, Input, Card } from './components/UI';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Compass } from 'lucide-react';
 
 const AUTH_KEY = 'navilink_auth';
 const checkAuth = () => {
@@ -66,7 +66,21 @@ const MainApp = () => {
     init();
   }, []);
 
-  if (state.isLoading) return <div className="h-screen w-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917]"><div className="w-10 h-10 border-4 border-stone-900 border-t-transparent rounded-full animate-spin dark:border-stone-100" /></div>;
+  // Update document title when settings change
+  useEffect(() => {
+    if (state.publicData.settings.title) {
+      document.title = state.publicData.settings.title;
+    }
+  }, [state.publicData.settings.title]);
+
+  if (state.isLoading) return (
+    <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917] gap-4">
+      <div className="w-12 h-12 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl animate-bounce">
+         <Compass size={24} />
+      </div>
+      <span className="text-stone-400 text-xs font-bold uppercase tracking-widest animate-pulse">Loading System...</span>
+    </div>
+  );
 
   return (
     <Routes>
