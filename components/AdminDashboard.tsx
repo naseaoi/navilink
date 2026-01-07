@@ -19,30 +19,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('cards');
   const [isSaving, setIsSaving] = useState(false);
-  
   const [localPublic, setLocalPublic] = useState<PublicData>(publicData);
   const [localPrivate, setLocalPrivate] = useState<PrivateData>(privateData);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Toast State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     setToasts(prev => [...prev, { id: Date.now(), message, type }]);
   }, []);
   const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  // Confirm State
-  const [confirmConfig, setConfirmConfig] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, variant: 'danger' | 'primary'}>({
-    isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'primary'
-  });
-
-  const confirm = (title: string, message: string, onConfirm: () => void, variant: 'danger' | 'primary' = 'primary') => {
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'primary' as 'danger'|'primary' });
+  const confirm = (title: string, message: string, onConfirm: () => void, variant: 'danger'|'primary' = 'primary') => {
     setConfirmConfig({ isOpen: true, title, message, onConfirm, variant });
   };
 
-  useEffect(() => {
-    setLocalPublic(publicData);
-  }, [publicData]);
+  useEffect(() => { setLocalPublic(publicData); }, [publicData]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -54,11 +46,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
       setHasChanges(false);
       showToast('设置保存成功', 'success');
     } catch (error) {
-      console.error(error);
-      showToast('保存失败，请检查配置', 'error');
-    } finally {
-      setIsSaving(false);
-    }
+      showToast('保存失败', 'error');
+    } finally { setIsSaving(false); }
   };
 
   const markChanged = () => setHasChanges(true);
@@ -67,85 +56,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
     <div className="fixed inset-0 flex flex-col md:flex-row bg-slate-50 dark:bg-slate-950 overflow-hidden">
       <ToastContainer messages={toasts} onRemove={removeToast} />
       <ConfirmModal 
-        isOpen={confirmConfig.isOpen} 
-        onClose={() => setConfirmConfig(prev => ({...prev, isOpen: false}))} 
-        onConfirm={confirmConfig.onConfirm}
-        title={confirmConfig.title}
-        message={confirmConfig.message}
-        variant={confirmConfig.variant}
+        isOpen={confirmConfig.isOpen} onClose={() => setConfirmConfig(p=>({...p, isOpen: false}))} 
+        onConfirm={confirmConfig.onConfirm} title={confirmConfig.title} message={confirmConfig.message} variant={confirmConfig.variant}
       />
 
-      {/* Sidebar - Desktop */}
       <aside className="hidden md:flex w-72 bg-slate-900 text-slate-300 flex-col flex-shrink-0 z-30 dark:bg-black dark:border-r dark:border-slate-800">
         <div className="p-8 border-b border-white/5 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg">
             <Shield size={22} />
           </div>
           <div>
-            <span className="font-bold text-white block leading-tight">NaviLink</span>
-            <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Admin Console</span>
+            <span className="font-black text-white block leading-tight">NaviLink</span>
+            <span className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Admin</span>
           </div>
         </div>
         
-        <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 p-6 space-y-2">
           <NavButton active={activeTab === 'cards'} onClick={() => setActiveTab('cards')} icon={<Layout size={20} />} label="卡片管理" />
           <NavButton active={activeTab === 'categories'} onClick={() => setActiveTab('categories')} icon={<Layers size={20} />} label="分类管理" />
           <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20} />} label="网站设置" />
         </nav>
 
         <div className="p-6 border-t border-white/5 space-y-3">
-          <Button 
-            variant="info" 
-            className="w-full justify-start py-3 h-auto rounded-xl" 
-            onClick={() => navigate('/')}
-          >
+          <Button variant="info" className="w-full justify-start py-3 h-auto" onClick={() => navigate('/')}>
             <Home size={18} className="mr-2" /> 返回首页
           </Button>
-          <Button variant="danger" className="w-full justify-start py-3 h-auto rounded-xl" onClick={onLogout}>
-            <LogOut size={18} className="mr-2" /> 退出登录
+          <Button variant="danger" className="w-full justify-start py-3 h-auto" onClick={onLogout}>
+            <LogOut size={18} className="mr-2" /> 退出
           </Button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 relative">
+      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950">
         <header className="flex-shrink-0 flex justify-between items-center p-6 md:px-12 md:py-8 bg-white/50 backdrop-blur-sm border-b border-slate-200 dark:bg-slate-900/50 dark:border-slate-800">
-          <div className="min-w-0">
-            <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-              {activeTab === 'cards' && '卡片管理'}
-              {activeTab === 'categories' && '分类管理'}
-              {activeTab === 'settings' && '网站设置'}
-            </h2>
-          </div>
-          <Button onClick={handleSave} disabled={!hasChanges} isLoading={isSaving} size="lg" className="px-8 shadow-xl shadow-indigo-600/10">
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-slate-100">
+            {activeTab === 'cards' ? '卡片管理' : activeTab === 'categories' ? '分类管理' : '网站设置'}
+          </h2>
+          <Button onClick={handleSave} disabled={!hasChanges} isLoading={isSaving} size="lg" className="px-8 shadow-xl">
             <Save size={18} className="mr-2" /> 保存
           </Button>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar">
-           <div className="max-w-[1600px] mx-auto space-y-8 pb-32">
-              {activeTab === 'settings' && (
-                <SettingsTab 
-                  publicData={localPublic} 
-                  privateData={localPrivate}
-                  onChangePublic={(d) => { setLocalPublic(d); markChanged(); }}
-                  onChangePrivate={(d) => { setLocalPrivate(d); markChanged(); }}
-                />
-              )}
-              {activeTab === 'cards' && (
-                <CardsTab 
-                  data={localPublic} 
-                  onChange={(d) => { setLocalPublic(d); markChanged(); }} 
-                  confirm={confirm}
-                />
-              )}
-              {activeTab === 'categories' && (
-                <CategoriesTab 
-                  data={localPublic} 
-                  onChange={(d) => { setLocalPublic(d); markChanged(); }} 
-                  confirm={confirm}
-                />
-              )}
+           <div className="max-w-6xl mx-auto space-y-8 pb-32">
+              {activeTab === 'settings' && <SettingsTab dataP={localPublic} dataV={localPrivate} onP={d=>{setLocalPublic(d); markChanged();}} onV={d=>{setLocalPrivate(d); markChanged();}} />}
+              {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
+              {activeTab === 'categories' && <CategoriesTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
            </div>
         </div>
       </main>
@@ -153,128 +109,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   );
 };
 
-const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl text-sm font-bold transition-all ${
-      active 
-        ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-600/20 scale-[1.02]' 
-        : 'text-slate-500 hover:text-white hover:bg-white/5 active:scale-95'
-    }`}
-  >
-    {icon}
-    {label}
+const NavButton = ({ active, onClick, icon, label }: any) => (
+  <button onClick={onClick} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-bold transition-all ${active ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+    {icon}{label}
   </button>
 );
 
-// --- Sub Tab Components ---
+const SettingsTab = ({ dataP, dataV, onP, onV }: any) => (
+  <div className="grid gap-8 lg:grid-cols-2">
+    <Card className="p-8 space-y-6">
+      <h3 className="text-lg font-black flex items-center gap-2"><Layout size={18} className="text-indigo-500"/> 基础信息</h3>
+      <Input label="站点标题" value={dataP.settings.title} onChange={e=>onP({...dataP, settings:{...dataP.settings, title:e.target.value}})} />
+      <Input label="站点图标 (Emoji/URL)" value={dataP.settings.icon} onChange={e=>onP({...dataP, settings:{...dataP.settings, icon:e.target.value}})} />
+    </Card>
+    <Card className="p-8 border-red-50 space-y-6">
+      <h3 className="text-lg font-black flex items-center gap-2"><Shield size={18} className="text-red-500"/> 管理账号</h3>
+      <Input label="管理员账号" value={dataV.admin.username} onChange={e=>onV({...dataV, admin:{...dataV.admin, username:e.target.value}})} />
+      <PasswordInput label="重置密码" placeholder="输入新密码..." onChange={e=>onV({...dataV, admin:{...dataV.admin, passwordHash:e.target.value}})} />
+    </Card>
+  </div>
+);
 
-const SettingsTab: React.FC<{ 
-  publicData: PublicData; 
-  privateData: PrivateData;
-  onChangePublic: (d: PublicData) => void;
-  onChangePrivate: (d: PrivateData) => void;
-}> = ({ publicData, privateData, onChangePublic, onChangePrivate }) => {
+const CategoriesTab = ({ data, onChange, confirm }: any) => {
+  const [editId, setEditId] = useState<string|null>(null);
+  const [tmp, setTmp] = useState('');
+  const add = () => onChange({...data, categories:[...data.categories, {id:`c${Date.now()}`, name:'新分类', order:data.categories.length}]});
   return (
-    <div className="grid gap-8 lg:grid-cols-2 animate-in fade-in slide-in-from-bottom-8 duration-500">
-      <Card className="p-8">
-        <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-8 flex items-center gap-3">
-           <Layout size={20} className="text-indigo-500" /> 基本信息
-        </h3>
-        <div className="space-y-6">
-          <Input 
-            label="导航标题" 
-            placeholder="网站顶部显示的文字"
-            value={publicData.settings.title} 
-            onChange={(e) => onChangePublic({...publicData, settings: {...publicData.settings, title: e.target.value}})} 
-          />
-          <Input 
-            label="站点图标" 
-            placeholder="Emoji 如 🚀 或 图片 URL"
-            value={publicData.settings.icon} 
-            onChange={(e) => onChangePublic({...publicData, settings: {...publicData.settings, icon: e.target.value}})} 
-          />
-        </div>
-      </Card>
-
-      <Card className="p-8 border-red-50/50 dark:border-red-900/10">
-        <h3 className="text-xl font-black text-red-600 dark:text-red-400 mb-8 flex items-center gap-3">
-           <Shield size={20} /> 管理安全
-        </h3>
-        <div className="space-y-6">
-          <Input 
-            label="管理员账号" 
-            value={privateData.admin.username}
-            onChange={(e) => onChangePrivate({...privateData, admin: {...privateData.admin, username: e.target.value}})}
-          />
-          <PasswordInput 
-            label="管理员密码" 
-            placeholder="留空则不修改"
-            value={privateData.admin.passwordHash}
-            onChange={(e) => onChangePrivate({...privateData, admin: {...privateData.admin, passwordHash: e.target.value}})}
-          />
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-const CategoriesTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, confirm: any }> = ({ data, onChange, confirm }) => {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [tempName, setTempName] = useState('');
-
-  const addCategory = () => {
-    const newCat: Category = { id: `cat_${Date.now()}`, name: '新分类', order: data.categories.length };
-    onChange({ ...data, categories: [...data.categories, newCat] });
-  };
-
-  const deleteCategory = (id: string) => {
-    confirm('删除分类', '确定要删除该分类吗？', () => {
-      onChange({ ...data, categories: data.categories.filter(c => c.id !== id) });
-    }, 'danger');
-  };
-
-  const startEdit = (cat: Category) => {
-    setEditingId(cat.id);
-    setTempName(cat.name);
-  };
-
-  const saveEdit = (id: string) => {
-    onChange({ ...data, categories: data.categories.map(c => c.id === id ? { ...c, name: tempName } : c) });
-    setEditingId(null);
-  };
-
-  return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
-      <div className="flex justify-between items-center mb-4">
-        <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">现有分类列表</p>
-        <Button variant="secondary" size="sm" onClick={addCategory} className="rounded-xl"><Plus size={18}/></Button>
-      </div>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">分类列表</span><Button variant="secondary" size="sm" onClick={add}><Plus size={16}/></Button></div>
       <div className="grid gap-3">
-        {data.categories.map((cat) => (
-          <div key={cat.id} className="flex items-center gap-4 p-5 bg-white rounded-xl border border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 transition-all hover:border-indigo-200">
-            {editingId === cat.id ? (
-              <div className="flex-1 flex flex-row items-center gap-3">
-                <div className="flex-1">
-                  <Input 
-                    autoFocus 
-                    value={tempName} 
-                    onChange={e => setTempName(e.target.value)} 
-                    onKeyDown={e => e.key === 'Enter' && saveEdit(cat.id)} 
-                  />
-                </div>
-                <Button size="sm" onClick={() => saveEdit(cat.id)} className="shrink-0">确认</Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="shrink-0 text-slate-400">取消</Button>
-              </div>
-            ) : (
-              <span className="flex-1 font-bold text-slate-700 dark:text-slate-200">{cat.name}</span>
-            )}
-            {!editingId || editingId !== cat.id ? (
-              <div className="flex gap-1">
-                <button onClick={() => startEdit(cat)} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={18}/></button>
-                <button onClick={() => deleteCategory(cat.id)} className="p-2.5 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={18}/></button>
-              </div>
-            ) : null}
+        {data.categories.map((c:any) => (
+          <div key={c.id} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
+            {editId === c.id ? <><div className="flex-1"><Input autoFocus value={tmp} onChange={e=>setTmp(e.target.value)} onKeyDown={e=>e.key==='Enter' && (onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}), setEditId(null))} /></div><Button size="sm" onClick={()=>{onChange({...data, categories:data.categories.map((x:any)=>x.id===c.id?{...x,name:tmp}:x)}); setEditId(null);}}>存</Button></> : <span className="flex-1 font-bold">{c.name}</span>}
+            {!editId && <div className="flex gap-1"><button onClick={()=>{setEditId(c.id); setTmp(c.name);}} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><Edit2 size={16}/></button><button onClick={()=>confirm('删除分类','确定删除吗？',()=>onChange({...data, categories:data.categories.filter((x:any)=>x.id!==c.id)}),'danger')} className="p-2 hover:bg-red-50 rounded-xl text-slate-400"><Trash2 size={16}/></button></div>}
           </div>
         ))}
       </div>
@@ -282,158 +149,83 @@ const CategoriesTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => v
   );
 };
 
-const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, confirm: any }> = ({ data, onChange, confirm }) => {
+const CardsTab = ({ data, onChange, confirm }: any) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Partial<LinkCard>>({});
   const [filterCat, setFilterCat] = useState('all');
-  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [draggedId, setDraggedId] = useState<string|null>(null);
 
-  const filteredCards = filterCat === 'all' 
-    ? data.cards 
-    : data.cards.filter(c => c.categoryId === filterCat);
+  const filtered = filterCat === 'all' ? data.cards : data.cards.filter((c:any) => c.categoryId === filterCat);
+  const sorted = [...filtered].sort((a,b) => a.order - b.order);
 
-  const sortedCards = [...filteredCards].sort((a, b) => a.order - b.order);
-
-  const updateCardOrder = (newSortedList: LinkCard[]) => {
-    const updatedCards = [...data.cards];
-    newSortedList.forEach((item, index) => {
-      const globalIdx = updatedCards.findIndex(c => c.id === item.id);
-      if (globalIdx !== -1) {
-        updatedCards[globalIdx] = { ...updatedCards[globalIdx], order: index };
-      }
-    });
-    onChange({ ...data, cards: updatedCards });
-  };
-
-  // Improved Real-time Swap Drag Handler
-  const onDragStart = (id: string) => {
-    setDraggedId(id);
-  };
-
+  const onDragStart = (id: string) => setDraggedId(id);
   const onDragEnter = (targetId: string) => {
     if (!draggedId || draggedId === targetId) return;
-
-    const newList = [...sortedCards];
+    const newList = [...sorted];
     const fromIdx = newList.findIndex(c => c.id === draggedId);
     const toIdx = newList.findIndex(c => c.id === targetId);
-
     if (fromIdx !== -1 && toIdx !== -1) {
       const [removed] = newList.splice(fromIdx, 1);
       newList.splice(toIdx, 0, removed);
-      updateCardOrder(newList);
+      const allCards = [...data.cards];
+      newList.forEach((item, index) => {
+        const globalIdx = allCards.findIndex(c => c.id === item.id);
+        if (globalIdx !== -1) allCards[globalIdx] = { ...allCards[globalIdx], order: index };
+      });
+      onChange({ ...data, cards: allCards });
     }
   };
 
-  const openNew = () => {
-    setEditingCard({ id: `card_${Date.now()}`, categoryId: data.categories[0]?.id || '', order: data.cards.length, icon: '', title: '', description: '', url: 'https://' });
-    setIsModalOpen(true);
-  };
-
-  const openEdit = (card: LinkCard) => {
-    setEditingCard({ ...card });
-    setIsModalOpen(true);
-  };
-
-  const saveCard = () => {
+  const openEdit = (card: LinkCard) => { setEditingCard(card); setIsModalOpen(true); };
+  const save = () => {
     if (!editingCard.title || !editingCard.url) return;
-    let newCards = [...data.cards];
-    const existingIndex = newCards.findIndex(c => c.id === editingCard.id);
-    if (existingIndex >= 0) newCards[existingIndex] = editingCard as LinkCard;
-    else newCards.push(editingCard as LinkCard);
-    onChange({ ...data, cards: newCards });
+    const cards = [...data.cards];
+    const idx = cards.findIndex(c => c.id === editingCard.id);
+    if (idx >= 0) cards[idx] = editingCard as LinkCard;
+    else cards.push(editingCard as LinkCard);
+    onChange({ ...data, cards });
     setIsModalOpen(false);
   };
 
-  const deleteCard = (id: string) => {
-    confirm('删除卡片', '确定要永久删除这个导航卡片吗？', () => {
-      onChange({ ...data, cards: data.cards.filter(c => c.id !== id) });
-    }, 'danger');
-  };
-
-  const selectOptions = [
-    { value: 'all', label: '显示所有卡片' },
-    ...data.categories.map(c => ({ value: c.id, label: c.name }))
-  ];
-
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-6">
-        <div className="flex-1 md:flex-none md:w-80">
-          <Select 
-            value={filterCat}
-            onChange={(val) => setFilterCat(val)}
-            options={selectOptions}
-          />
-        </div>
-        <Button onClick={openNew} size="icon" className="shadow-lg shadow-indigo-600/20 shrink-0">
-          <Plus size={24} />
-        </Button>
+        <Select options={[{value:'all', label:'显示所有卡片'}, ...data.categories.map((c:any)=>({value:c.id, label:c.name}))]} value={filterCat} onChange={setFilterCat} className="md:w-64" />
+        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', order:data.cards.length, url:'https://'}); setIsModalOpen(true);}} size="icon"><Plus size={20}/></Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5 gap-4">
-        {sortedCards.map((card) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+        {sorted.map(card => (
           <div 
-            key={card.id} 
-            draggable
-            onDragStart={() => onDragStart(card.id)}
-            onDragOver={(e) => e.preventDefault()}
-            onDragEnter={() => onDragEnter(card.id)}
-            onDragEnd={() => setDraggedId(null)}
-            className={`bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3.5 hover:border-indigo-400 hover:shadow-lg transition-all dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500 group cursor-grab active:cursor-grabbing ${draggedId === card.id ? 'opacity-30 scale-95 ring-2 ring-indigo-500 ring-offset-2' : ''}`}
+            key={card.id} draggable onDragStart={()=>onDragStart(card.id)} onDragOver={e=>e.preventDefault()} onDragEnter={()=>onDragEnter(card.id)} onDragEnd={()=>setDraggedId(null)}
+            className={`group bg-white p-3 rounded-2xl border border-slate-100 flex items-center gap-3 transition-all cursor-grab active:cursor-grabbing hover:border-indigo-300 dark:bg-slate-900 dark:border-slate-800 ${draggedId === card.id ? 'opacity-20 scale-95' : ''}`}
           >
-            <div className="shrink-0 text-slate-300 dark:text-slate-700 group-hover:text-indigo-400 transition-colors">
-              <GripVertical size={18} strokeWidth={2.5} />
+            <GripVertical size={16} className="text-slate-300 shrink-0" />
+            <div className="w-10 h-10 shrink-0 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 overflow-hidden dark:bg-slate-800 dark:border-slate-700">
+              <img src={card.icon} className="w-6 h-6 object-contain" onError={e=>(e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}/>
             </div>
-            
-            <div className="w-12 h-12 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center overflow-hidden border border-slate-100 dark:bg-slate-800 dark:border-slate-700 pointer-events-none">
-               <img 
-                src={card.icon || `https://www.google.com/s2/favicons?domain=${new URL(card.url || 'https://google.com').hostname}&sz=128`} 
-                className="w-8 h-8 object-contain" 
-                alt="" 
-                onError={(e) => {(e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=64`}} 
-              />
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-xs truncate group-hover:text-indigo-600 transition-colors">{card.title}</h4>
+              <p className="text-[9px] text-slate-400 truncate opacity-60">{card.url}</p>
             </div>
-            
-            <div className="flex-1 min-w-0 pointer-events-none">
-              <h4 className="font-bold text-sm text-slate-900 truncate dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{card.title}</h4>
-              <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono tracking-tighter opacity-70">{card.url}</p>
-              <div className="mt-1.5">
-                 <span className="text-[9px] px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md font-black uppercase tracking-widest border border-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
-                   {data.categories.find(c => c.id === card.categoryId)?.name || '未分类'}
-                 </span>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-              <button onClick={(e) => { e.stopPropagation(); openEdit(card); }} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:bg-slate-800 transition-all"><Edit2 size={16}/></button>
-              <button onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600 dark:hover:bg-red-900/20 transition-all"><Trash2 size={16}/></button>
+            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+              <button onClick={()=>openEdit(card)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><Edit2 size={14}/></button>
+              <button onClick={()=>confirm('删除','确定吗？',()=>onChange({...data, cards:data.cards.filter((x:any)=>x.id!==card.id)}),'danger')} className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400"><Trash2 size={14}/></button>
             </div>
           </div>
         ))}
-        {sortedCards.length === 0 && <div className="text-center text-slate-400 py-16 border-2 border-dashed border-slate-200 rounded-xl col-span-full dark:border-slate-800 font-bold">暂无内容</div>}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCard.id?.includes('new') ? "新建导航" : "编辑卡片"}>
-        <div className="space-y-6">
-          <Input label="显示标题" placeholder="例如: Google" value={editingCard.title || ''} onChange={e => setEditingCard({...editingCard, title: e.target.value})} />
-          <Input label="跳转 URL" placeholder="https://..." value={editingCard.url || ''} onChange={e => setEditingCard({...editingCard, url: e.target.value})} />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <Input label="图标 URL (可选)" placeholder="留空则自动抓取" value={editingCard.icon || ''} onChange={e => setEditingCard({...editingCard, icon: e.target.value})} />
-             <Select 
-                label="所属分类" 
-                value={editingCard.categoryId || ''} 
-                onChange={val => setEditingCard({...editingCard, categoryId: val})}
-                options={data.categories.map(c => ({ value: c.id, label: c.name }))}
-              />
+      <Modal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} title="编辑项目">
+        <div className="space-y-4">
+          <Input label="显示名称" value={editingCard.title||''} onChange={e=>setEditingCard({...editingCard, title:e.target.value})} />
+          <Input label="目标 URL" value={editingCard.url||''} onChange={e=>setEditingCard({...editingCard, url:e.target.value})} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="图标 (可选)" value={editingCard.icon||''} onChange={e=>setEditingCard({...editingCard, icon:e.target.value})} />
+            <Select label="所属分类" value={editingCard.categoryId||''} onChange={v=>setEditingCard({...editingCard, categoryId:v})} options={data.categories.map((c:any)=>({value:c.id, label:c.name}))} />
           </div>
-          <div className="w-full">
-            <label className="mb-1.5 block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">描述摘要</label>
-            <textarea className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all outline-none dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200" rows={2} placeholder="简单描述这个网站..." value={editingCard.description || ''} onChange={e => setEditingCard({...editingCard, description: e.target.value})} />
-          </div>
-          <div className="pt-6 flex gap-4">
-             <Button variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1">取消</Button>
-             <Button onClick={saveCard} className="flex-1">保存并更新</Button>
-          </div>
+          <textarea className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:ring-4 focus:ring-indigo-500/5 outline-none dark:bg-slate-950 dark:border-slate-800" placeholder="简单描述一下..." rows={2} value={editingCard.description||''} onChange={e=>setEditingCard({...editingCard, description:e.target.value})} />
+          <div className="pt-4 flex gap-3"><Button variant="secondary" className="flex-1" onClick={()=>setIsModalOpen(false)}>取消</Button><Button className="flex-1" onClick={save}>保存</Button></div>
         </div>
       </Modal>
     </div>
