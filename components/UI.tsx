@@ -107,8 +107,14 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 dark:bg-stone-900 dark:border dark:border-stone-800">
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-300"
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 dark:bg-stone-900 dark:border dark:border-stone-800"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100 dark:border-stone-800">
           <h3 className="text-lg font-serif font-bold text-stone-900 dark:text-stone-100">{title}</h3>
           <button onClick={onClose} className="p-2 text-stone-400 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-all dark:hover:bg-stone-800">
@@ -133,8 +139,14 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string }> =
 export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; message: string; variant?: 'danger' | 'primary'; }> = ({ isOpen, onClose, onConfirm, title, message, variant = 'primary' }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 dark:bg-stone-900 dark:border dark:border-stone-800 text-center">
+    <div 
+      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-sm bg-white rounded-xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 dark:bg-stone-900 dark:border dark:border-stone-800 text-center"
+        onClick={e => e.stopPropagation()}
+      >
         <h3 className="text-lg font-serif font-bold text-stone-900 dark:text-stone-100 mb-2">{title}</h3>
         <p className="text-stone-500 dark:text-stone-400 text-sm mb-8">{message}</p>
         <div className="flex gap-4">
