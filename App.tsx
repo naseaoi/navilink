@@ -1,13 +1,11 @@
-
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { PublicView } from './components/PublicView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { webdav } from './services/webdavService';
 import { AppState, PublicData, PrivateData } from './types';
-// Removed non-exported Loader2 as it is not used in this file
 import { Button, Input, Card } from './components/UI';
-import { Lock, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 // --- Auth Utilities ---
 const AUTH_KEY = 'navilink_auth';
@@ -170,16 +168,6 @@ const MainApp = () => {
     <Routes>
       <Route path="/" element={<PublicView data={state.publicData} />} />
       <Route path="/tat" element={
-        isAuthenticated ? (
-          <Navigate to="/admin" replace />
-        ) : (
-          <AdminLogin 
-            onLogin={() => setIsAuthenticated(true)} 
-            privateData={privateData}
-          />
-        )
-      } />
-      <Route path="/admin" element={
         isAuthenticated && privateData ? (
           <AdminDashboard 
             publicData={state.publicData} 
@@ -193,9 +181,15 @@ const MainApp = () => {
             }} 
           />
         ) : (
-          <Navigate to="/tat" replace />
+          <AdminLogin 
+            onLogin={() => setIsAuthenticated(true)} 
+            privateData={privateData}
+          />
         )
       } />
+      {/* Remove /admin and redirect to home if accessed directly */}
+      <Route path="/admin" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

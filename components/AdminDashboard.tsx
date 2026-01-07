@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PublicData, PrivateData, LinkCard, Category } from '../types';
 import { webdav } from '../services/webdavService';
 import { Button, Input, Select, Modal, Card, PasswordInput, ToastContainer, ToastMessage, ToastType, ConfirmModal } from './UI';
-import { Settings, Layout, Layers, LogOut, Plus, Trash2, Edit2, GripVertical, Save, Shield, Home, ArrowUp, ArrowDown } from 'lucide-react';
+import { Settings, Layout, Layers, LogOut, Plus, Trash2, Edit2, GripVertical, Save, Shield, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminDashboardProps {
@@ -305,27 +305,23 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
     onChange({ ...data, cards: updatedCards });
   };
 
-  // Drag and Drop Handlers
+  // Improved Real-time Swap Drag Handler
   const onDragStart = (id: string) => {
     setDraggedId(id);
   };
 
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const onDrop = (targetId: string) => {
+  const onDragEnter = (targetId: string) => {
     if (!draggedId || draggedId === targetId) return;
 
     const newList = [...sortedCards];
     const fromIdx = newList.findIndex(c => c.id === draggedId);
     const toIdx = newList.findIndex(c => c.id === targetId);
 
-    const [removed] = newList.splice(fromIdx, 1);
-    newList.splice(toIdx, 0, removed);
-
-    updateCardOrder(newList);
-    setDraggedId(null);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const [removed] = newList.splice(fromIdx, 1);
+      newList.splice(toIdx, 0, removed);
+      updateCardOrder(newList);
+    }
   };
 
   const openNew = () => {
@@ -354,18 +350,20 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
     }, 'danger');
   };
 
+  const selectOptions = [
+    { value: 'all', label: '显示所有卡片' },
+    ...data.categories.map(c => ({ value: c.id, label: c.name }))
+  ];
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
       <div className="flex items-center justify-between gap-6">
-        <div className="relative flex-1 md:flex-none md:w-80">
+        <div className="flex-1 md:flex-none md:w-80">
           <Select 
             value={filterCat}
-            onChange={(e) => setFilterCat(e.target.value)}
-            className="w-full bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl py-2 pl-4 pr-10 text-sm focus:ring-4 focus:ring-indigo-500/5 transition-all appearance-none"
-          >
-            <option value="all">显示所有卡片</option>
-            {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
+            onChange={(val) => setFilterCat(val)}
+            options={selectOptions}
+          />
         </div>
         <Button onClick={openNew} size="icon" className="shadow-lg shadow-indigo-600/20 shrink-0">
           <Plus size={24} />
@@ -378,9 +376,10 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
             key={card.id} 
             draggable
             onDragStart={() => onDragStart(card.id)}
-            onDragOver={onDragOver}
-            onDrop={() => onDrop(card.id)}
-            className={`bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3.5 hover:border-indigo-400 hover:shadow-lg transition-all dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500 group cursor-grab active:cursor-grabbing ${draggedId === card.id ? 'opacity-30 border-indigo-500 scale-95' : ''}`}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={() => onDragEnter(card.id)}
+            onDragEnd={() => setDraggedId(null)}
+            className={`bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3.5 hover:border-indigo-400 hover:shadow-lg transition-all dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500 group cursor-grab active:cursor-grabbing ${draggedId === card.id ? 'opacity-30 scale-95 ring-2 ring-indigo-500 ring-offset-2' : ''}`}
           >
             <div className="shrink-0 text-slate-300 dark:text-slate-700 group-hover:text-indigo-400 transition-colors">
               <GripVertical size={18} strokeWidth={2.5} />
@@ -420,9 +419,12 @@ const CardsTab: React.FC<{ data: PublicData; onChange: (d: PublicData) => void, 
           <Input label="跳转 URL" placeholder="https://..." value={editingCard.url || ''} onChange={e => setEditingCard({...editingCard, url: e.target.value})} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <Input label="图标 URL (可选)" placeholder="留空则自动抓取" value={editingCard.icon || ''} onChange={e => setEditingCard({...editingCard, icon: e.target.value})} />
-             <Select label="所属分类" value={editingCard.categoryId} onChange={e => setEditingCard({...editingCard, categoryId: e.target.value})}>
-                {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-             </Select>
+             <Select 
+                label="所属分类" 
+                value={editingCard.categoryId || ''} 
+                onChange={val => setEditingCard({...editingCard, categoryId: val})}
+                options={data.categories.map(c => ({ value: c.id, label: c.name }))}
+              />
           </div>
           <div className="w-full">
             <label className="mb-1.5 block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">描述摘要</label>
