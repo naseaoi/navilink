@@ -9,10 +9,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md', isLoading, className = '', children, ...props }) => {
-  const base = "inline-flex items-center justify-center font-bold transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
+  const base = "inline-flex items-center justify-center font-bold transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
   
   const variants = {
-    primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-200 dark:shadow-none",
+    primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-200/20 dark:shadow-none",
     secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800",
     danger: "bg-red-500 text-white hover:bg-red-600 shadow-sm dark:shadow-none",
     info: "bg-sky-500 text-white hover:bg-sky-600 shadow-sm dark:shadow-none",
@@ -20,10 +20,10 @@ export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md'
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-xs rounded-lg",
-    md: "px-4 py-2 text-sm rounded-xl",
-    lg: "px-6 py-3 text-base rounded-xl",
-    icon: "p-2 rounded-xl w-10 h-10"
+    sm: "px-3 py-1.5 text-[10px] rounded-lg",
+    md: "px-4 py-2 text-xs rounded-xl",
+    lg: "px-6 py-3 text-sm rounded-xl",
+    icon: "p-2 rounded-xl w-9 h-9"
   };
 
   return (
@@ -36,9 +36,9 @@ export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md'
 // --- Input ---
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string }> = ({ label, className = '', ...props }) => (
   <div className="w-full">
-    {label && <label className="mb-1.5 block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
+    {label && <label className="mb-1 block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
     <input
-      className={`flex h-10 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100 ${className}`}
+      className={`flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100 ${className}`}
       {...props}
     />
   </div>
@@ -73,25 +73,25 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
 
   return (
     <div className={`relative w-full ${className}`} ref={containerRef}>
-      {label && <label className="mb-1.5 block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
+      {label && <label className="mb-1 block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm transition-all hover:border-slate-300 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100"
+        className="flex h-9 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs transition-all hover:border-slate-300 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100"
       >
-        <span className="truncate font-medium">{selectedOption?.label || '选择分类...'}</span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="truncate font-bold">{selectedOption?.label || '选择分类...'}</span>
+        <ChevronDown size={12} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       
       {isOpen && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white/95 backdrop-blur-xl p-1 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 dark:bg-slate-900/95 dark:border-slate-800">
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white/95 backdrop-blur-xl p-1 shadow-xl animate-in fade-in slide-in-from-top-1 duration-200 dark:bg-slate-900/95 dark:border-slate-800">
           {options.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => { onChange(opt.value); setIsOpen(false); }}
-              className={`flex w-full items-center px-3 py-2 text-sm font-bold rounded-lg transition-colors ${
-                value === opt.value ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              className={`flex w-full items-center px-3 py-2 text-xs font-bold rounded-lg transition-colors ${
+                value === opt.value ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
               }`}
             >
               {opt.label}
@@ -107,15 +107,15 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 dark:bg-slate-900 dark:border dark:border-slate-800">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/20 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 dark:bg-slate-900 dark:border dark:border-slate-800">
         <div className="flex items-center justify-between px-8 py-6 border-b border-slate-50 dark:border-slate-800">
-          <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">{title}</h3>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all dark:hover:bg-slate-800">
-            <X size={20} />
+          <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight">{title}</h3>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-2xl transition-all dark:hover:bg-slate-800">
+            <X size={18} />
           </button>
         </div>
-        <div className="px-8 py-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
+        <div className="px-8 py-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
           {children}
         </div>
       </div>
@@ -134,10 +134,10 @@ export const ConfirmModal: React.FC<{
 }> = ({ isOpen, onClose, onConfirm, title, message, variant = 'primary' }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800 text-center">
-        <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 mb-2">{title}</h3>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 font-medium">{message}</p>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/20 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800 text-center">
+        <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mb-2">{title}</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-xs mb-8 font-medium">{message}</p>
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={onClose}>取消</Button>
           <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); onClose(); }}>确定</Button>
@@ -152,7 +152,7 @@ export type ToastType = 'success' | 'error' | 'info';
 export interface ToastMessage { id: number; type: ToastType; message: string; }
 
 export const ToastContainer: React.FC<{ messages: ToastMessage[]; onRemove: (id: number) => void }> = ({ messages, onRemove }) => (
-  <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-3 items-center pointer-events-none">
+  <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none">
     {messages.map((toast) => (
       <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
     ))}
@@ -165,8 +165,8 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: (id: number) => void 
     return () => clearTimeout(timer);
   }, []);
   return (
-    <div className="pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/90 backdrop-blur-xl border border-slate-200 shadow-xl animate-in slide-in-from-top-4 duration-300 dark:bg-slate-900/90 dark:border-slate-800">
-      <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{toast.message}</span>
+    <div className="pointer-events-auto flex items-center gap-3 px-5 py-2 rounded-full bg-white/90 backdrop-blur-xl border border-slate-200 shadow-lg animate-in slide-in-from-top-2 duration-300 dark:bg-slate-900/90 dark:border-slate-800">
+      <span className="text-[10px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest">{toast.message}</span>
     </div>
   );
 };
@@ -176,15 +176,15 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
   const [show, setShow] = useState(false);
   return (
     <div className="w-full">
-      {label && <label className="mb-1.5 block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
+      {label && <label className="mb-1 block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</label>}
       <div className="relative">
         <input
           type={show ? 'text' : 'password'}
-          className={`flex h-10 w-full rounded-xl border border-slate-200 bg-white pl-4 pr-12 py-2 text-sm transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100 ${className}`}
+          className={`flex h-9 w-full rounded-xl border border-slate-200 bg-white pl-4 pr-10 py-2 text-xs transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100 ${className}`}
           {...props}
         />
         <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-indigo-500 transition-colors">
-          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+          {show ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
       </div>
     </div>
