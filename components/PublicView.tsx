@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PublicData, LinkCard } from '../types';
-import { Search, Compass, ArrowUpRight, Command, X } from 'lucide-react';
+import { Search, Compass, ArrowUpRight, Command, X, Sun, Moon, Monitor } from 'lucide-react';
 import { Modal, Button } from './UI';
 
 interface PublicViewProps {
   data: PublicData;
+  theme?: 'light' | 'dark' | 'system';
+  onToggleTheme?: () => void;
 }
 
-export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
+export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', onToggleTheme }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +53,14 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
     return cards.sort((a, b) => a.order - b.order);
   }, [data.cards, selectedCategory, searchQuery]);
 
+  const ThemeIcon = useMemo(() => {
+    switch(theme) {
+      case 'dark': return Moon;
+      case 'light': return Sun;
+      default: return Monitor;
+    }
+  }, [theme]);
+
   return (
     <div className="min-h-screen bg-[#fafaf9] text-stone-800 dark:bg-[#1c1917] dark:text-stone-200 transition-colors duration-500 font-sans">
       
@@ -70,13 +80,27 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
           </div>
 
           {/* Action Icons */}
-          <button 
-            onClick={() => setIsSearchOpen(true)}
-            className="w-10 h-10 rounded-full hover:bg-stone-200/50 dark:hover:bg-stone-800 flex items-center justify-center transition-colors text-stone-600 dark:text-stone-400"
-            aria-label="Search"
-          >
-            <Search size={22} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="w-10 h-10 rounded-full hover:bg-stone-200/50 dark:hover:bg-stone-800 flex items-center justify-center transition-colors text-stone-600 dark:text-stone-400"
+              aria-label="Search"
+              title="Search (Cmd+K)"
+            >
+              <Search size={22} />
+            </button>
+            
+            {onToggleTheme && (
+              <button 
+                onClick={onToggleTheme}
+                className="w-10 h-10 rounded-full hover:bg-stone-200/50 dark:hover:bg-stone-800 flex items-center justify-center transition-colors text-stone-600 dark:text-stone-400"
+                aria-label="Switch Theme"
+                title={`Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`}
+              >
+                <ThemeIcon size={22} />
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -92,12 +116,19 @@ export const PublicView: React.FC<PublicViewProps> = ({ data }) => {
 
       {/* --- Main Grid --- */}
       <main className="max-w-7xl mx-auto px-4 py-8 pb-32 min-h-[60vh]">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-          {filteredCards.map(card => (
-            <CardItem key={card.id} card={card} onClick={() => setConfirmUrl(card.url)} />
+        {/* Added key={selectedCategory} to force re-render and trigger animation on category change */}
+        <div key={selectedCategory} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+          {filteredCards.map((card, index) => (
+            <CardItem 
+              key={card.id} 
+              card={card} 
+              onClick={() => setConfirmUrl(card.url)} 
+              style={{ animationDelay: `${index * 50}ms` }}
+              className="animate-card-enter"
+            />
           ))}
           {filteredCards.length === 0 && (
-            <div className="col-span-full py-24 text-center">
+            <div className="col-span-full py-24 text-center animate-card-enter">
                <p className="text-stone-400 font-serif italic text-lg">No treasures found.</p>
             </div>
           )}
@@ -167,10 +198,11 @@ const CategoryTab: React.FC<{ active: boolean; label: string; onClick: () => voi
   </button>
 );
 
-const CardItem: React.FC<{ card: LinkCard; onClick: () => void }> = ({ card, onClick }) => (
+const CardItem: React.FC<{ card: LinkCard; onClick: () => void; style?: React.CSSProperties; className?: string }> = ({ card, onClick, style, className = '' }) => (
   <div 
     onClick={onClick}
-    className="group bg-white dark:bg-[#252220] p-5 rounded-xl border border-stone-100 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-none transition-all duration-300 cursor-pointer flex flex-col gap-4 h-full"
+    style={style}
+    className={`group bg-white dark:bg-[#252220] p-5 rounded-xl border border-stone-100 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-none transition-all duration-300 cursor-pointer flex flex-col gap-4 h-full ${className}`}
   >
     <div className="flex items-start justify-between">
       <div className="w-12 h-12 rounded-xl bg-stone-50 dark:bg-stone-900/50 border border-stone-100 dark:border-stone-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">

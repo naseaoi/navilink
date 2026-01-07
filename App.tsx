@@ -53,6 +53,37 @@ const MainApp = () => {
   const [state, setState] = useState<AppState>({ publicData: { settings: { title: 'NaviLink', icon: '' }, categories: [], cards: [] }, isLoading: true, error: null });
   const [privateData, setPrivateData] = useState<PrivateData | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(checkAuth());
+  
+  // Theme State
+  const [theme, setTheme] = useState<'light'|'dark'|'system'>('system');
+
+  // Load Theme
+  useEffect(() => {
+    const stored = localStorage.getItem('navilink_theme') as any;
+    if (stored) setTheme(stored);
+  }, []);
+
+  // Apply Theme
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = () => {
+      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      root.classList.toggle('dark', isDark);
+    };
+    apply();
+    localStorage.setItem('navilink_theme', theme);
+    
+    if (theme === 'system') {
+      const m = window.matchMedia('(prefers-color-scheme: dark)');
+      m.addEventListener('change', apply);
+      return () => m.removeEventListener('change', apply);
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const cycle: Record<string, 'light'|'dark'|'system'> = { 'system': 'light', 'light': 'dark', 'dark': 'system' };
+    setTheme(cycle[theme]);
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -84,7 +115,7 @@ const MainApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<PublicView data={state.publicData} />} />
+      <Route path="/" element={<PublicView data={state.publicData} theme={theme} onToggleTheme={toggleTheme} />} />
       <Route path="/tat" element={
         isAuthenticated && privateData ? (
           <AdminDashboard 
