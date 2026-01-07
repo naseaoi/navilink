@@ -31,19 +31,19 @@ const AdminLogin: React.FC<{ onLogin: () => void; privateData: PrivateData | nul
     } else setError("凭据无效");
   };
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
-      <Card className="w-full max-w-sm p-10 space-y-8 animate-in zoom-in-95 duration-500">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-indigo-600 rounded-[2rem] mx-auto flex items-center justify-center text-white mb-6 shadow-2xl shadow-indigo-600/20"><ShieldCheck size={32} /></div>
-          <h2 className="text-2xl font-black tracking-tight">安全中心</h2>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Auth Verification</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#fafaf9] p-6 dark:bg-[#1c1917] font-sans">
+      <Card className="w-full max-w-sm p-10 space-y-8 animate-in zoom-in-95 duration-500 border border-stone-200 shadow-xl shadow-stone-200/50 dark:border-stone-800 dark:shadow-none">
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 bg-stone-900 rounded-full mx-auto flex items-center justify-center text-white mb-6 shadow-xl shadow-stone-900/20 dark:bg-stone-100 dark:text-stone-900"><ShieldCheck size={28} /></div>
+          <h2 className="text-2xl font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100">安全中心</h2>
+          <p className="text-stone-400 text-xs font-bold uppercase tracking-widest">Auth Verification</p>
         </div>
-        {error && <div className="text-center text-red-500 text-xs font-bold">{error}</div>}
-        <div className="space-y-4">
+        {error && <div className="text-center text-red-600 text-sm font-medium bg-red-50 py-2 rounded-lg dark:bg-red-900/20 dark:text-red-400">{error}</div>}
+        <div className="space-y-5">
           <Input label="用户名" value={username} onChange={e=>setUsername(e.target.value)} />
           <Input label="授权密码" type="password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleLogin()} />
         </div>
-        <Button className="w-full py-4 rounded-2xl" onClick={handleLogin}>验证身份</Button>
+        <Button className="w-full py-3 rounded-xl text-base shadow-lg shadow-stone-900/10" onClick={handleLogin}>验证身份</Button>
       </Card>
     </div>
   );
@@ -66,7 +66,7 @@ const MainApp = () => {
     init();
   }, []);
 
-  if (state.isLoading) return <div className="h-screen w-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (state.isLoading) return <div className="h-screen w-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917]"><div className="w-10 h-10 border-4 border-stone-900 border-t-transparent rounded-full animate-spin dark:border-stone-100" /></div>;
 
   return (
     <Routes>
