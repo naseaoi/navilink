@@ -91,13 +91,9 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
             className="flex items-center gap-3 select-none cursor-default"
             onClick={handleTitleClick}
           >
-            <div className="w-10 h-10 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl shadow-stone-900/10 overflow-hidden">
-              {data.settings.icon ? (
-                data.settings.icon.startsWith('http') ? (
-                  <img src={data.settings.icon} alt={data.settings.title} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-lg">{data.settings.icon}</span>
-                )
+            <div className="w-10 h-10 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl shadow-stone-900/10">
+              {data.settings.icon && !data.settings.icon.startsWith('http') ? (
+                <span className="text-lg">{data.settings.icon}</span>
               ) : <Compass size={20} />}
             </div>
             <h1 className="text-2xl font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100">
