@@ -112,6 +112,35 @@ const MainApp = () => {
     }
   }, [state.publicData.settings.title]);
 
+  // Update favicon when settings change
+  useEffect(() => {
+    const icon = state.publicData.settings.icon;
+    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    
+    if (icon) {
+      if (icon.startsWith('http')) {
+        link.href = icon;
+      } else { // Assume emoji
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.font = '48px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(icon, 32, 32);
+          link.href = canvas.toDataURL('image/png');
+        }
+      }
+    }
+  }, [state.publicData.settings.icon]);
+
   if (state.isLoading) return (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917] gap-4">
       <div className="w-12 h-12 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl animate-bounce">
