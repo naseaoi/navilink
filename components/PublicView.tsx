@@ -15,7 +15,6 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  // 更新状态以存储整个卡片对象，而不仅仅是 URL
   const [confirmCard, setConfirmCard] = useState<LinkCard | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,7 +88,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Logo / Title */}
           <div 
-            className="flex items-center gap-3 select-none cursor-default active:scale-95 transition-transform"
+            className="flex items-center gap-3 select-none cursor-default"
             onClick={handleTitleClick}
           >
             <div className="w-10 h-10 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl shadow-stone-900/10">
@@ -183,29 +182,29 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
         {data.settings.footerText || `© 2025 ${data.settings.title}. Minimalism.`}
       </footer>
 
-      {/* --- Exit Modal (Enhanced Content) --- */}
+      {/* --- Exit Modal (Redesigned) --- */}
       <Modal isOpen={!!confirmCard} onClose={() => setConfirmCard(null)} title="即将离开本站">
-        <div className="space-y-6 pt-2">
-          <div className="flex items-center gap-4 p-4 bg-stone-50 dark:bg-stone-900/50 rounded-xl border border-stone-100 dark:border-stone-800">
-            <div className="w-14 h-14 rounded-lg bg-white dark:bg-stone-800 border border-stone-100 dark:border-stone-700 flex items-center justify-center shrink-0">
-              <img 
-                src={confirmCard?.icon} 
-                className="w-9 h-9 object-contain"
-                onError={e => { try { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(confirmCard?.url || '').hostname}&sz=128` } catch {} }}
-                alt=""
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-lg text-stone-900 dark:text-stone-100 truncate">{confirmCard?.title}</h4>
-              <p className="text-sm text-stone-500 dark:text-stone-400 line-clamp-2">{confirmCard?.description || '暂无详细描述。'}</p>
-            </div>
+        <div className="flex flex-col items-center text-center space-y-6 pt-2">
+          {/* Icon */}
+          <div className="w-20 h-20 rounded-2xl bg-white dark:bg-stone-800 border border-stone-100 dark:border-stone-700 flex items-center justify-center shrink-0 shadow-lg shadow-stone-200/50">
+            <img 
+              src={confirmCard?.icon} 
+              className="w-12 h-12 object-contain"
+              onError={e => { try { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(confirmCard?.url || '').hostname}&sz=128` } catch {} }}
+              alt={confirmCard?.title}
+            />
+          </div>
+
+          {/* Title & Description */}
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-xl text-stone-900 dark:text-stone-100">{confirmCard?.title}</h4>
+            <p className="text-base text-stone-500 dark:text-stone-400 mt-2 max-w-xs mx-auto">
+              {confirmCard?.description || '暂无详细描述。'}
+            </p>
           </div>
           
-          <div className="p-3 bg-stone-100 dark:bg-stone-900 rounded-lg text-[10px] font-mono text-stone-400 break-all border border-stone-200 dark:border-stone-800">
-            {confirmCard?.url}
-          </div>
-          
-          <div className="flex gap-4 pt-2">
+          {/* Buttons */}
+          <div className="w-full flex gap-4 pt-4">
             <Button variant="secondary" className="flex-1 h-12 text-base" onClick={() => setConfirmCard(null)}>取消</Button>
             <Button className="flex-1 h-12 text-base" onClick={() => { if(confirmCard) { window.open(confirmCard.url, '_blank'); setConfirmCard(null); } }}>
               确认前往 <ArrowUpRight className="ml-2" size={18} />

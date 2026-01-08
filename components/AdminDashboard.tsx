@@ -208,7 +208,6 @@ const CategoriesTab = ({ data, onChange, confirm }: any) => {
             {editId === c.id ? (
               <>
                 <div className="flex-1 min-w-0">
-                  {/* Fixed onChange handler to use event parameter properly */}
                   <Input autoFocus value={tmpName} onChange={e => setTmpName(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSave(c.id)} />
                 </div>
                 <Button size="sm" onClick={()=>handleSave(c.id)}>保存</Button>
@@ -337,9 +336,9 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               if (draggedId) return;
               setActiveMenuId(activeMenuId === card.id ? null : card.id);
             }}
-            className={`group relative bg-white pl-1.5 pr-8 py-4 rounded-2xl border border-stone-200 flex items-center gap-3 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''} ${activeMenuId === card.id ? 'border-stone-400 shadow-md ring-2 ring-stone-900/5' : ''}`}
+            className={`group relative bg-white pl-1.5 pr-8 py-4 rounded-2xl border border-stone-200 flex items-center gap-2.5 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''} ${activeMenuId === card.id ? 'border-stone-400 shadow-md ring-2 ring-stone-900/5' : ''}`}
           >
-            {/* 拖拽图标：更紧凑 */}
+            {/* 拖拽图标 */}
             <div 
               draggable 
               onDragStart={()=>onDragStart(card.id)} 
@@ -353,19 +352,19 @@ const CardsTab = ({ data, onChange, confirm }: any) => {
               <GripVertical size={10} />
             </div>
 
-            {/* Icon：缩小尺寸并左移 */}
-            <div className="w-12 h-12 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800 group-hover:scale-105 transition-transform duration-300">
+            {/* Icon */}
+            <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800 group-hover:scale-105 transition-transform duration-300">
               <img 
                 src={card.icon} 
-                className="w-7 h-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
+                className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
                 onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` } catch {} }}
                 alt=""
               />
             </div>
 
-            {/* 文字内容：缩小标题字体 */}
+            {/* 文字内容 */}
             <div className="flex-1 min-w-0 flex flex-col gap-1 overflow-hidden">
-              <h4 className="font-bold text-lg text-stone-800 dark:text-stone-200 leading-tight truncate">{card.title}</h4>
+              <h4 className="font-bold text-base text-stone-800 dark:text-stone-200 leading-tight truncate">{card.title}</h4>
               {card.description && <p className="text-xs text-stone-400 truncate leading-tight">{card.description}</p>}
               <p className="text-[10px] text-stone-300 font-mono truncate opacity-80">
                 {(() => { try { return new URL(card.url).hostname } catch { return card.url } })()}
