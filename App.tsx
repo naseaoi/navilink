@@ -8,30 +8,50 @@ import { Button, Input, Card } from './components/UI';
 import { ShieldCheck, Compass, CheckSquare, Square } from 'lucide-react';
 
 const AUTH_KEY = 'navilink_auth';
+const AUTH_TOKEN_KEY = 'navilink_token';
+const AUTH_EXP_KEY = 'navilink_auth_exp';
+
 const checkAuth = () => {
-  const expiry = localStorage.getItem(`${AUTH_KEY}_expiry`);
-  if (!expiry) return false;
-  if (new Date().getTime() > parseInt(expiry)) {
+  const expiry = localStorage.getItem(AUTH_EXP_KEY);
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!expiry || !token) return false;
+  if (Date.now() > parseInt(expiry, 10)) {
     localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_EXP_KEY);
     return false;
   }
-  return !!localStorage.getItem(AUTH_KEY);
+  return true;
 };
 
-const AdminLogin: React.FC<{ onLogin: () => void; privateData: PrivateData | null }> = ({ onLogin, privateData }) => {
+const AdminLogin: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const handleLogin = () => {
-    if (!privateData) return;
-    if (username === privateData.admin.username && password === privateData.admin.passwordHash) {
+  const handleLogin = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, remember })
+      });
+
+      if (!response.ok) throw new Error('Invalid credentials');
+      const { token, exp } = await response.json();
       localStorage.setItem(AUTH_KEY, 'true');
-      const duration = remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days vs 24 hours
-      localStorage.setItem(`${AUTH_KEY}_expiry`, (new Date().getTime() + duration).toString());
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+      localStorage.setItem(AUTH_EXP_KEY, String(exp));
       onLogin();
-    } else setError("凭据无效");
+    } catch (e) {
+      setError('凭据无效');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -51,7 +71,7 @@ const AdminLogin: React.FC<{ onLogin: () => void; privateData: PrivateData | nul
              <span className="text-sm">30天免登录</span>
           </div>
         </div>
-        <Button className="w-full py-3 rounded-xl text-base shadow-lg shadow-stone-900/10" onClick={handleLogin}>验证身份</Button>
+        <Button className="w-full py-3 rounded-xl text-base shadow-lg shadow-stone-900/10" onClick={handleLogin} isLoading={isSubmitting}>验证身份</Button>
       </Card>
     </div>
   );
@@ -98,12 +118,27 @@ const MainApp = () => {
       try {
         const pub = await webdav.fetchPublicData();
         setState(prev => ({ ...prev, publicData: pub, isLoading: false }));
-        const priv = await webdav.fetchPrivateData();
-        setPrivateData(priv);
       } catch (e) { setState(prev => ({ ...prev, isLoading: false, error: "无法同步远程数据" })); }
     };
     init();
   }, []);
+
+  useEffect(() => {
+    const loadPrivate = async () => {
+      if (!isAuthenticated) return;
+      try {
+        const priv = await webdav.fetchPrivateData();
+        setPrivateData(priv);
+      } catch (e) {
+        localStorage.removeItem(AUTH_KEY);
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(AUTH_EXP_KEY);
+        setPrivateData(null);
+        setIsAuthenticated(false);
+      }
+    };
+    loadPrivate();
+  }, [isAuthenticated]);
 
   // Update document title when settings change
   useEffect(() => {
@@ -157,13 +192,13 @@ const MainApp = () => {
         // Fix flash: If authenticated but privateData not yet loaded, show loading instead of login
         isAuthenticated ? (
           privateData ? (
-            <AdminDashboard 
-              publicData={state.publicData} 
-              privateData={privateData}
-              onUpdatePublic={d=>setState(s=>({...s, publicData:d}))}
-              onUpdatePrivate={setPrivateData}
-              onLogout={() => { localStorage.removeItem(AUTH_KEY); setIsAuthenticated(false); }} 
-            />
+             <AdminDashboard 
+               publicData={state.publicData} 
+               privateData={privateData}
+               onUpdatePublic={d=>setState(s=>({...s, publicData:d}))}
+               onUpdatePrivate={setPrivateData}
+               onLogout={() => { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_EXP_KEY); setIsAuthenticated(false); }} 
+             />
           ) : (
             // Re-using the loading spinner style for admin transition
              <div className="h-screen w-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917]">
@@ -172,7 +207,7 @@ const MainApp = () => {
                 </div>
              </div>
           )
-        ) : <AdminLogin onLogin={()=>setIsAuthenticated(true)} privateData={privateData} />
+        ) : <AdminLogin onLogin={()=>setIsAuthenticated(true)} />
       } />
       <Route path="/admin" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

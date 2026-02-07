@@ -20,17 +20,23 @@ export interface LinkCard {
   order: number;
 }
 
+export interface DataMeta {
+  updatedAt?: number;
+}
+
 export interface PublicData {
   settings: SiteSettings;
   categories: Category[];
   cards: LinkCard[];
+  _meta?: DataMeta;
 }
 
 export interface PrivateData {
   admin: {
     username: string;
-    passwordHash: string; // Storing plain text for simplicity in this demo, but should be hashed in real app
+    passwordHash: string; // scrypt$<salt>$<hash> or legacy plain text
   };
+  _meta?: DataMeta;
 }
 
 export interface AppState {

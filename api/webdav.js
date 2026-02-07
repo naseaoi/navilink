@@ -1,5 +1,7 @@
+import crypto from 'crypto';
+
 export default async function handler(request, response) {
-  const { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH } = process.env;
+  const { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH, AUTH_SECRET } = process.env;
 
   if (!WEBDAV_URL || !WEBDAV_USERNAME || !WEBDAV_PASSWORD) {
     return response.status(500).json({ error: 'WebDAV environment variables are missing on Vercel.' });
@@ -7,6 +9,37 @@ export default async function handler(request, response) {
 
   const { file } = request.query;
   const fileName = file || 'public.json';
+
+  const isPrivate = fileName === 'private.json';
+  const isWrite = request.method === 'PUT';
+
+  const getAuthToken = () => {
+    const header = request.headers.authorization || '';
+    if (header.startsWith('Bearer ')) return header.slice('Bearer '.length);
+    return null;
+  };
+
+  const verifyToken = (token) => {
+    if (!token || !AUTH_SECRET) return null;
+    const [body, sig] = token.split('.');
+    if (!body || !sig) return null;
+    const expected = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expected);
+    if (sigBuf.length !== expBuf.length) return null;
+    const valid = crypto.timingSafeEqual(sigBuf, expBuf);
+    if (!valid) return null;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if (payload.exp && Date.now() > payload.exp) return null;
+    return payload;
+  };
+
+  if (isPrivate || isWrite) {
+    if (!AUTH_SECRET) return response.status(500).json({ error: 'AUTH_SECRET is missing.' });
+    const token = getAuthToken();
+    const payload = verifyToken(token);
+    if (!payload) return response.status(401).json({ error: 'Unauthorized' });
+  }
   
   // 健壮的路径拼接逻辑
   const baseUrl = WEBDAV_URL.replace(/\/+$/, ''); // 移除结尾斜杠
@@ -29,7 +62,24 @@ export default async function handler(request, response) {
     };
 
     if (method === 'PUT') {
-      fetchOptions.body = JSON.stringify(request.body);
+      const normalizePrivateData = (data) => {
+        if (!data?.admin?.passwordHash) return data;
+        if (!data.admin.passwordHash.startsWith('scrypt$')) {
+          const salt = crypto.randomBytes(16).toString('hex');
+          const hash = crypto.scryptSync(data.admin.passwordHash, salt, 64).toString('hex');
+          return { ...data, admin: { ...data.admin, passwordHash: `scrypt$${salt}$${hash}` } };
+        }
+        return data;
+      };
+
+      const withTimestamp = (data) => {
+        if (!data || (fileName !== 'public.json' && fileName !== 'private.json')) return data;
+        return { ...data, _meta: { ...(data._meta || {}), updatedAt: Date.now() } };
+      };
+
+      const bodyData = isPrivate ? normalizePrivateData(request.body) : request.body;
+      const stamped = withTimestamp(bodyData);
+      fetchOptions.body = JSON.stringify(stamped);
       fetchOptions.headers['Content-Type'] = 'application/json';
     }
 

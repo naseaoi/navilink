@@ -1,4 +1,4 @@
-import { PublicData, PrivateData, EnvConfig } from '../types';
+import { PublicData, PrivateData } from '../types';
 
 const DEFAULT_PUBLIC_DATA: PublicData = {
   settings: {
@@ -54,6 +54,59 @@ class WebDavService {
     this.isMock = false; 
   }
 
+  private getAuthToken(): string | null {
+    return localStorage.getItem('navilink_token');
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const token = this.getAuthToken();
+    if (!token) throw new Error('Not authenticated');
+    return { Authorization: `Bearer ${token}` };
+  }
+
+  async getStorageMode(): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
+    const response = await fetch('/api/storage/mode', {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load storage mode');
+    return response.json();
+  }
+
+  async setStorageMode(mode: 'local' | 'webdav'): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
+    const response = await fetch('/api/storage/mode', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders()
+      },
+      body: JSON.stringify({ mode })
+    });
+    if (!response.ok) throw new Error('Failed to update storage mode');
+    return response.json();
+  }
+
+  async syncStorage(from: 'local' | 'webdav', to: 'local' | 'webdav'): Promise<void> {
+    const response = await fetch('/api/storage/sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders()
+      },
+      body: JSON.stringify({ from, to })
+    });
+    if (!response.ok) throw new Error('Failed to sync storage');
+  }
+
+  async getStorageStatus(): Promise<{ local: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; webdav: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; available: { local: boolean; webdav: boolean } }> {
+    const response = await fetch('/api/storage/status', {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load storage status');
+    return response.json();
+  }
+
   async fetchPublicData(): Promise<PublicData> {
     try {
       // Use the Vercel API Proxy
@@ -89,7 +142,8 @@ class WebDavService {
       const response = await fetch('/api/webdav?file=public.json', {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders()
         },
         body: JSON.stringify(data)
       });
@@ -107,6 +161,7 @@ class WebDavService {
     try {
       const response = await fetch('/api/webdav?file=private.json', {
         method: 'GET',
+        headers: this.getAuthHeaders(),
       });
 
       if (response.status === 404) {
@@ -133,7 +188,8 @@ class WebDavService {
       const response = await fetch('/api/webdav?file=private.json', {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders()
         },
         body: JSON.stringify(data)
       });

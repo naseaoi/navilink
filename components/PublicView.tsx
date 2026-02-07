@@ -67,7 +67,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
     if (selectedCategory !== 'all') cards = cards.filter(c => c.categoryId === selectedCategory);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      cards = cards.filter(c => c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q));
+      cards = cards.filter(c => (c.title || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
     }
     return cards.sort((a, b) => a.order - b.order);
   }, [data.cards, selectedCategory, searchQuery]);

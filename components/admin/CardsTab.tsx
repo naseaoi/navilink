@@ -1,0 +1,190 @@
+import React, { useEffect, useState } from 'react';
+import { Edit2, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { Button, Input, Modal, Select } from '../UI';
+import { LinkCard, PublicData } from '../../types';
+
+interface CardsTabProps {
+  data: PublicData;
+  onChange: (data: PublicData) => void;
+  confirm: (title: string, message: string, onConfirm: () => void, variant?: 'danger' | 'primary') => void;
+}
+
+export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState<Partial<LinkCard>>({});
+  const [filterCat, setFilterCat] = useState('all');
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  const filtered = filterCat === 'all' ? data.cards : data.cards.filter((c:any) => c.categoryId === filterCat);
+  const sorted = [...filtered].sort((a, b) => a.order - b.order);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setActiveMenuId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  const onDragStart = (id: string) => setDraggedId(id);
+
+  const onDragEnter = (targetId: string) => {
+    if (!draggedId || draggedId === targetId) return;
+
+    const allCards = [...data.cards];
+    const draggedIdx = allCards.findIndex(c => c.id === draggedId);
+    const targetIdx = allCards.findIndex(c => c.id === targetId);
+
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const draggedOrder = allCards[draggedIdx].order;
+    allCards[draggedIdx].order = allCards[targetIdx].order;
+    allCards[targetIdx].order = draggedOrder;
+
+    onChange({ ...data, cards: allCards });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, id: string) => {
+    setDraggedId(id);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!draggedId) return;
+
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cardEl = target?.closest('[data-card-id]');
+
+    if (cardEl) {
+      const targetId = cardEl.getAttribute('data-card-id');
+      if (targetId && targetId !== draggedId) {
+        onDragEnter(targetId);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    const reindexed = data.cards
+      .sort((a: LinkCard, b: LinkCard) => a.order - b.order)
+      .map((card: LinkCard, index: number) => ({ ...card, order: index }));
+    onChange({ ...data, cards: reindexed });
+    setDraggedId(null);
+  };
+
+  const openEdit = (card: LinkCard) => { setEditingCard(card); setIsModalOpen(true); };
+
+  const save = () => {
+    if (!editingCard.title || !editingCard.url) return;
+    let cards = [...data.cards];
+    const idx = cards.findIndex(c => c.id === editingCard.id);
+
+    if (idx >= 0) {
+      cards[idx] = editingCard as LinkCard;
+    } else {
+      const maxOrder = Math.max(...cards.map(c => c.order), -1);
+      cards.push({ ...editingCard, order: maxOrder + 1 } as LinkCard);
+    }
+    onChange({ ...data, cards });
+    setIsModalOpen(false);
+  };
+
+  const handleDelete = (id: string) => {
+    confirm('删除卡片', '您确定要删除这张卡片吗？', () => {
+      onChange({ ...data, cards: data.cards.filter((c: LinkCard) => c.id !== id) });
+    }, 'danger');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <Select 
+          options={[{value:'all', label:'所有卡片'}, ...data.categories.map((c:any)=>({value:c.id, label:c.name}))]} 
+          value={filterCat} 
+          onChange={setFilterCat} 
+          className="w-auto min-w-[120px] max-w-[50%]" 
+        />
+        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10 shrink-0"><Plus size={20}/></Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-x-6 gap-y-6">
+        {sorted.map(card => (
+          <div 
+            key={card.id} 
+            data-card-id={card.id}
+            onDragOver={e=>e.preventDefault()} 
+            onDragEnter={()=>onDragEnter(card.id)} 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (draggedId) return;
+              setActiveMenuId(activeMenuId === card.id ? null : card.id);
+            }}
+            className={`group relative bg-white pl-1.5 pr-8 py-4 rounded-2xl border border-stone-200 flex items-center gap-2.5 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''} ${activeMenuId === card.id ? 'border-stone-400 shadow-md ring-2 ring-stone-900/5' : ''}`}
+          >
+            <div 
+              draggable 
+              onDragStart={()=>onDragStart(card.id)} 
+              onDragEnd={handleTouchEnd}
+              onTouchStart={(e) => handleTouchStart(e, card.id)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onClick={(e) => e.stopPropagation()}
+              className="cursor-grab active:cursor-grabbing p-0.5 -ml-0.5 text-stone-300 hover:text-stone-500 touch-none shrink-0"
+            >
+              <GripVertical size={10} />
+            </div>
+
+            <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800 group-hover:scale-105 transition-transform duration-300">
+              <img 
+                src={card.icon} 
+                className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
+                onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` } catch {} }}
+                alt=""
+              />
+            </div>
+
+            <div className="flex-1 min-w-0 flex flex-col gap-1 overflow-hidden">
+              <h4 className="font-bold text-base text-stone-800 dark:text-stone-200 leading-tight truncate">{card.title}</h4>
+              {card.description && <p className="text-xs text-stone-400 truncate leading-tight">{card.description}</p>}
+              <p className="text-[10px] text-stone-300 font-mono truncate opacity-80">
+                {(() => { try { return new URL(card.url).hostname } catch { return card.url } })()}
+              </p>
+            </div>
+            
+            <div 
+              className={`absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 transition-all bg-white/95 dark:bg-stone-900/95 backdrop-blur-sm p-1 rounded-xl shadow-lg border border-stone-100 dark:border-stone-800 ${activeMenuId === card.id ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:scale-100 group-hover:visible'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button 
+                onClick={(e)=>{ e.stopPropagation(); openEdit(card); }} 
+                className="p-2 hover:bg-stone-100 rounded-lg text-stone-500 hover:text-stone-800 dark:hover:bg-stone-800"
+              >
+                <Edit2 size={14}/>
+              </button>
+              <button 
+                onClick={(e)=>{ e.stopPropagation(); handleDelete(card.id); }} 
+                className="p-2 hover:bg-red-50 rounded-lg text-stone-500 hover:text-red-500 dark:hover:bg-red-950/30"
+              >
+                <Trash2 size={14}/>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} title={editingCard.id?.startsWith('card_') ? "编辑项目" : "新增项目"}>
+        <div className="space-y-4">
+          <Input label="显示名称" value={editingCard.title||''} onChange={e=>setEditingCard({...editingCard, title:e.target.value})} />
+          <Input label="目标 URL" value={editingCard.url||''} onChange={e=>setEditingCard({...editingCard, url:e.target.value})} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="图标 (可选)" placeholder="留空自动获取" value={editingCard.icon||''} onChange={e=>setEditingCard({...editingCard, icon:e.target.value})} />
+            <Select label="所属分类" value={editingCard.categoryId||''} onChange={v=>setEditingCard({...editingCard, categoryId:v})} options={data.categories.map((c:any)=>({value:c.id, label:c.name}))} />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-stone-600 dark:text-stone-400">描述</label>
+            <textarea className="w-full rounded-lg border border-stone-200 p-3 text-sm focus:border-stone-500 focus:outline-none dark:bg-stone-950 dark:border-stone-800 dark:text-stone-100" placeholder="简单描述一下..." rows={2} value={editingCard.description||''} onChange={e=>setEditingCard({...editingCard, description:e.target.value})} />
+          </div>
+          <div className="pt-4 flex gap-3"><Button variant="secondary" className="flex-1" onClick={()=>setIsModalOpen(false)}>取消</Button><Button className="flex-1" onClick={save}>保存</Button></div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
