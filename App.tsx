@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { PublicView } from './components/PublicView';
-import { AdminDashboard } from './components/AdminDashboard';
 import { webdav } from './services/webdavService';
 import { AppState, PrivateData } from './types';
 import { Button, Input, Card } from './components/UI';
@@ -10,6 +9,8 @@ import { ShieldCheck, Compass, CheckSquare, Square } from 'lucide-react';
 const AUTH_KEY = 'navilink_auth';
 const AUTH_TOKEN_KEY = 'navilink_token';
 const AUTH_EXP_KEY = 'navilink_auth_exp';
+const AUTH_FORCE_CHANGE_KEY = 'navilink_force_change_password';
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((mod) => ({ default: mod.AdminDashboard })));
 
 const checkAuth = () => {
   const expiry = localStorage.getItem(AUTH_EXP_KEY);
@@ -19,12 +20,15 @@ const checkAuth = () => {
     localStorage.removeItem(AUTH_KEY);
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem(AUTH_EXP_KEY);
+    localStorage.removeItem(AUTH_FORCE_CHANGE_KEY);
     return false;
   }
   return true;
 };
 
-const AdminLogin: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
+const checkPasswordPolicyFlag = () => localStorage.getItem(AUTH_FORCE_CHANGE_KEY) === '1';
+
+const AdminLogin: React.FC<{ onLogin: (mustChangePassword: boolean) => void }> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -42,11 +46,13 @@ const AdminLogin: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
       });
 
       if (!response.ok) throw new Error('Invalid credentials');
-      const { token, exp } = await response.json();
+      const { token, exp, mustChangePassword } = await response.json();
       localStorage.setItem(AUTH_KEY, 'true');
       localStorage.setItem(AUTH_TOKEN_KEY, token);
       localStorage.setItem(AUTH_EXP_KEY, String(exp));
-      onLogin();
+      if (mustChangePassword) localStorage.setItem(AUTH_FORCE_CHANGE_KEY, '1');
+      else localStorage.removeItem(AUTH_FORCE_CHANGE_KEY);
+      onLogin(!!mustChangePassword);
     } catch (e) {
       setError('凭据无效');
     } finally {
@@ -59,8 +65,8 @@ const AdminLogin: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
       <Card className="w-full max-w-sm p-10 space-y-8 animate-in zoom-in-95 duration-500 border border-stone-200 shadow-xl shadow-stone-200/50 dark:border-stone-800 dark:shadow-none">
         <div className="text-center space-y-3">
           <div className="w-16 h-16 bg-stone-900 rounded-full mx-auto flex items-center justify-center text-white mb-6 shadow-xl shadow-stone-900/20 dark:bg-stone-100 dark:text-stone-900"><ShieldCheck size={28} /></div>
-          <h2 className="text-2xl font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100">安全中心</h2>
-          <p className="text-stone-400 text-xs font-bold uppercase tracking-widest">Auth Verification</p>
+          <h2 className="text-2xl font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100">安全中心 Security</h2>
+          <p className="text-stone-400 text-xs font-bold uppercase tracking-widest">身份验证 Auth Verification</p>
         </div>
         {error && <div className="text-center text-red-600 text-sm font-medium bg-red-50 py-2 rounded-lg dark:bg-red-900/20 dark:text-red-400">{error}</div>}
         <div className="space-y-5">
@@ -81,6 +87,7 @@ const MainApp = () => {
   const [state, setState] = useState<AppState>({ publicData: { settings: { title: 'NaviLink', icon: '' }, categories: [], cards: [] }, isLoading: true, error: null });
   const [privateData, setPrivateData] = useState<PrivateData | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(checkAuth());
+  const [mustChangePassword, setMustChangePassword] = useState(checkPasswordPolicyFlag());
   
   // Theme State
   const [theme, setTheme] = useState<'light'|'dark'|'system'>('system');
@@ -133,8 +140,10 @@ const MainApp = () => {
         localStorage.removeItem(AUTH_KEY);
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_EXP_KEY);
+        localStorage.removeItem(AUTH_FORCE_CHANGE_KEY);
         setPrivateData(null);
         setIsAuthenticated(false);
+        setMustChangePassword(false);
       }
     };
     loadPrivate();
@@ -192,13 +201,17 @@ const MainApp = () => {
         // Fix flash: If authenticated but privateData not yet loaded, show loading instead of login
         isAuthenticated ? (
           privateData ? (
-             <AdminDashboard 
-               publicData={state.publicData} 
-               privateData={privateData}
-               onUpdatePublic={d=>setState(s=>({...s, publicData:d}))}
-               onUpdatePrivate={setPrivateData}
-               onLogout={() => { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_EXP_KEY); setIsAuthenticated(false); }} 
-             />
+            <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917]"><div className="w-12 h-12 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl animate-bounce"><Compass size={24} /></div></div>}>
+              <AdminDashboard
+                publicData={state.publicData}
+                privateData={privateData}
+                mustChangePassword={mustChangePassword}
+                onPasswordPolicyResolved={() => { localStorage.removeItem(AUTH_FORCE_CHANGE_KEY); setMustChangePassword(false); }}
+                onUpdatePublic={d=>setState(s=>({...s, publicData:d}))}
+                onUpdatePrivate={setPrivateData}
+                onLogout={() => { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_EXP_KEY); localStorage.removeItem(AUTH_FORCE_CHANGE_KEY); setIsAuthenticated(false); setMustChangePassword(false); }}
+              />
+            </Suspense>
           ) : (
             // Re-using the loading spinner style for admin transition
              <div className="h-screen w-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#1c1917]">
@@ -207,7 +220,7 @@ const MainApp = () => {
                 </div>
              </div>
           )
-        ) : <AdminLogin onLogin={()=>setIsAuthenticated(true)} />
+        ) : <AdminLogin onLogin={(nextMustChangePassword)=>{ setMustChangePassword(nextMustChangePassword); setIsAuthenticated(true); }} />
       } />
       <Route path="/admin" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

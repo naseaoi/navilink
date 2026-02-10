@@ -8,7 +8,12 @@ export default async function handler(request, response) {
   }
 
   const { file } = request.query;
-  const fileName = file || 'public.json';
+  const requestedFile = typeof file === 'string' ? file.trim() : 'public.json';
+  const allowedFiles = new Set(['public.json', 'private.json']);
+  if (!allowedFiles.has(requestedFile)) {
+    return response.status(400).json({ error: 'Invalid file parameter' });
+  }
+  const fileName = requestedFile;
 
   const isPrivate = fileName === 'private.json';
   const isWrite = request.method === 'PUT';

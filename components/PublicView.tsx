@@ -1,8 +1,36 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useDeferredValue, useState, useMemo, useEffect, useRef } from 'react';
 import { PublicData, LinkCard } from '../types';
-import { Search, Compass, ArrowUpRight, Command, X, Sun, Moon, Monitor } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { Modal, Button } from './UI';
 import { useNavigate } from 'react-router-dom';
+import { PublicHeader } from './public/PublicHeader';
+import { CategoryTabs } from './public/CategoryTabs';
+import { CardGrid } from './public/CardGrid';
+import { SearchOverlay } from './public/SearchOverlay';
+
+const FALLBACK_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="#E7E5E4"/><rect x="16" y="18" width="32" height="28" rx="6" stroke="#78716C" stroke-width="3"/><circle cx="26" cy="28" r="3" fill="#78716C"/><path d="M20 42l9-9 6 6 5-5 8 8" stroke="#78716C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+)}`;
+
+const resolveIconSrc = (icon?: string) => (icon && icon.trim() ? icon : FALLBACK_ICON);
+
+const handleIconError = (event: React.SyntheticEvent<HTMLImageElement, Event>, url?: string) => {
+  const target = event.currentTarget;
+  if (target.dataset.fallback === 'favicon') {
+    target.src = FALLBACK_ICON;
+    return;
+  }
+  if (!url) {
+    target.src = FALLBACK_ICON;
+    return;
+  }
+  try {
+    target.src = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`;
+    target.dataset.fallback = 'favicon';
+  } catch {
+    target.src = FALLBACK_ICON;
+  }
+};
 
 interface PublicViewProps {
   data: PublicData;
@@ -16,7 +44,14 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmCard, setConfirmCard] = useState<LinkCard | null>(null);
+  const [gridRenderKey, setGridRenderKey] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const closeSearch = () => {
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    setGridRenderKey((prev) => prev + 1);
+  };
 
   // Triple Click Logic
   const clickRef = useRef({ count: 0, lastTime: 0 });
@@ -56,129 +91,53 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
         e.preventDefault();
         setIsSearchOpen(true);
       }
-      if (e.key === 'Escape') setIsSearchOpen(false);
+      if (e.key === 'Escape') closeSearch();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const filteredCards = useMemo(() => {
-    let cards = data.cards;
+    let cards = [...data.cards];
     if (selectedCategory !== 'all') cards = cards.filter(c => c.categoryId === selectedCategory);
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (deferredSearchQuery.trim()) {
+      const q = deferredSearchQuery.toLowerCase();
       cards = cards.filter(c => (c.title || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
     }
     return cards.sort((a, b) => a.order - b.order);
-  }, [data.cards, selectedCategory, searchQuery]);
+  }, [data.cards, selectedCategory, deferredSearchQuery]);
 
-  const ThemeIcon = useMemo(() => {
-    switch(theme) {
-      case 'dark': return Moon;
-      case 'light': return Sun;
-      default: return Monitor;
-    }
-  }, [theme]);
+  const searchResults = useMemo(() => filteredCards.slice(0, 8), [filteredCards]);
+
+  const openSearchResult = (card: LinkCard) => {
+    setConfirmCard(card);
+    closeSearch();
+  };
 
   return (
-    <div className="min-h-screen bg-[#fafaf9] text-stone-800 dark:bg-[#1c1917] dark:text-stone-200 transition-colors duration-500 font-sans">
-      
-      {/* --- Minimal Header --- */}
-      <header className="sticky top-0 z-40 bg-[#fafaf9]/80 dark:bg-[#1c1917]/80 backdrop-blur-md border-b border-stone-200/50 dark:border-stone-800/50 transition-all">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          {/* Logo / Title */}
-          <div 
-            className="flex items-center gap-3 select-none cursor-default"
-            onClick={handleTitleClick}
-          >
-            <div className="w-10 h-10 bg-stone-900 dark:bg-stone-100 rounded-full flex items-center justify-center text-white dark:text-stone-900 shadow-xl shadow-stone-900/10">
-              {data.settings.icon && !data.settings.icon.startsWith('http') ? (
-                <span className="text-lg">{data.settings.icon}</span>
-              ) : <Compass size={20} />}
-            </div>
-            <h1 className="text-2xl font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100">
-              {data.settings.title}
-            </h1>
-          </div>
-
-          {/* Action Icons */}
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="w-10 h-10 rounded-full hover:bg-stone-200/50 dark:hover:bg-stone-800 flex items-center justify-center transition-colors text-stone-600 dark:text-stone-400"
-              aria-label="Search"
-              title="Search (Cmd+K)"
-            >
-              <Search size={22} />
-            </button>
-            
-            {onToggleTheme && (
-              <button 
-                onClick={onToggleTheme}
-                className="w-10 h-10 rounded-full hover:bg-stone-200/50 dark:hover:bg-stone-800 flex items-center justify-center transition-colors text-stone-600 dark:text-stone-400"
-                aria-label="Switch Theme"
-                title={`Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`}
-              >
-                <ThemeIcon size={22} />
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* --- Category Tabs (Clean Text) --- */}
-      <nav className="pt-8 pb-4 px-6 max-w-7xl mx-auto overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-8 border-b border-stone-200 dark:border-stone-800 w-max min-w-full px-2">
-          <CategoryTab active={selectedCategory === 'all'} onClick={() => setSelectedCategory('all')} label="全部" />
-          {data.categories.sort((a,b) => a.order - b.order).map(cat => (
-            <CategoryTab key={cat.id} active={selectedCategory === cat.id} onClick={() => setSelectedCategory(cat.id)} label={cat.name} />
-          ))}
-        </div>
-      </nav>
-
-      {/* --- Main Grid --- */}
-      <main className="max-w-7xl mx-auto px-4 py-8 pb-32 min-h-[60vh]">
-        <div key={selectedCategory} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-          {filteredCards.map((card, index) => (
-            <CardItem 
-              key={card.id} 
-              card={card} 
-              onClick={() => setConfirmCard(card)} 
-              style={{ animationDelay: `${index * 50}ms` }}
-              className="animate-card-enter"
-            />
-          ))}
-          {filteredCards.length === 0 && (
-            <div className="col-span-full py-24 text-center animate-card-enter">
-               <p className="text-stone-400 font-serif italic text-lg">No treasures found.</p>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* --- Search Overlay (Zen Mode) --- */}
-      {isSearchOpen && (
-        <div className="fixed inset-0 z-[100] bg-stone-50/95 dark:bg-stone-950/95 backdrop-blur-sm animate-in fade-in duration-200 flex flex-col items-center pt-[15vh] px-6">
-          <div className="w-full max-w-2xl relative">
-            <button onClick={() => setIsSearchOpen(false)} className="absolute -right-2 -top-12 md:-right-12 md:top-0 p-2 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100">
-              <X size={28} />
-            </button>
-            <input
-              ref={searchInputRef}
-              className="w-full bg-transparent border-b-2 border-stone-200 dark:border-stone-800 text-3xl md:text-5xl font-serif font-bold text-stone-900 dark:text-stone-100 px-2 py-4 focus:outline-none focus:border-stone-900 dark:focus:border-stone-100 placeholder:text-stone-300 dark:placeholder:text-stone-700 transition-colors"
-              placeholder="Type to search..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            <div className="mt-8 text-center text-stone-400 text-sm font-medium flex items-center justify-center gap-2">
-              <Command size={14} /> K to search anytime
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="min-h-screen flex flex-col bg-[#fafaf9] text-stone-800 dark:bg-[#1c1917] dark:text-stone-200 transition-colors duration-500 font-sans">
+      <PublicHeader
+        title={data.settings.title}
+        icon={data.settings.icon}
+        theme={theme}
+        onSearchOpen={() => setIsSearchOpen(true)}
+        onToggleTheme={onToggleTheme}
+        onTitleClick={handleTitleClick}
+      />
+      <CategoryTabs categories={data.categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
+      <CardGrid cards={filteredCards} selectedCategory={selectedCategory} gridRenderKey={gridRenderKey} onCardClick={setConfirmCard} />
+      <SearchOverlay
+        isOpen={isSearchOpen}
+        searchQuery={searchQuery}
+        searchResults={searchResults}
+        searchInputRef={searchInputRef}
+        onClose={closeSearch}
+        onSearchQueryChange={setSearchQuery}
+        onOpenResult={openSearchResult}
+      />
 
       {/* --- Simple Footer --- */}
-      <footer className="py-12 text-center text-stone-400 text-sm font-medium">
+      <footer className="mt-auto py-8 text-center text-stone-400 text-sm font-medium">
         {data.settings.footerText || `© 2025 ${data.settings.title}. Minimalism.`}
       </footer>
 
@@ -188,9 +147,11 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
           {/* Icon */}
           <div className="w-20 h-20 rounded-2xl bg-white dark:bg-stone-800 border border-stone-100 dark:border-stone-700 flex items-center justify-center shrink-0 shadow-lg shadow-stone-200/50">
             <img 
-              src={confirmCard?.icon} 
+              src={resolveIconSrc(confirmCard?.icon)} 
               className="w-12 h-12 object-contain"
-              onError={e => { try { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(confirmCard?.url || '').hostname}&sz=128` } catch {} }}
+              loading="lazy"
+              decoding="async"
+              onError={(e) => handleIconError(e, confirmCard?.url)}
               alt={confirmCard?.title}
             />
           </div>
@@ -206,7 +167,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
           {/* Buttons */}
           <div className="w-full flex gap-4 pt-4">
             <Button variant="secondary" className="flex-1 h-12 text-base" onClick={() => setConfirmCard(null)}>取消</Button>
-            <Button className="flex-1 h-12 text-base" onClick={() => { if(confirmCard) { window.open(confirmCard.url, '_blank'); setConfirmCard(null); } }}>
+            <Button className="flex-1 h-12 text-base" onClick={() => { if(confirmCard) { window.open(confirmCard.url, '_blank', 'noopener,noreferrer'); setConfirmCard(null); } }}>
               确认前往 <ArrowUpRight className="ml-2" size={18} />
             </Button>
           </div>
@@ -216,46 +177,3 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
   );
 };
 
-const CategoryTab: React.FC<{ active: boolean; label: string; onClick: () => void }> = ({ active, label, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`pb-4 px-2 text-base font-medium transition-all relative whitespace-nowrap ${
-      active 
-        ? 'text-stone-900 dark:text-stone-100' 
-        : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-300'
-    }`}
-  >
-    {label}
-    {active && (
-      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900 dark:bg-stone-100 rounded-full" />
-    )}
-  </button>
-);
-
-const CardItem: React.FC<{ card: LinkCard; onClick: () => void; style?: React.CSSProperties; className?: string }> = ({ card, onClick, style, className = '' }) => (
-  <div 
-    onClick={onClick}
-    style={style}
-    className={`group bg-white dark:bg-[#252220] p-5 rounded-xl border border-stone-100 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-none transition-all duration-300 cursor-pointer flex flex-col gap-4 h-full ${className}`}
-  >
-    <div className="flex items-start justify-between">
-      <div className="w-12 h-12 rounded-xl bg-stone-50 dark:bg-stone-900/50 border border-stone-100 dark:border-stone-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
-        <img 
-          src={card.icon} 
-          className="w-7 h-7 object-contain opacity-90 group-hover:opacity-100"
-          onError={e => { try { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` } catch {} }}
-        />
-      </div>
-      <ArrowUpRight size={18} className="text-stone-300 group-hover:text-stone-800 dark:group-hover:text-stone-200 transition-colors" />
-    </div>
-    
-    <div>
-      <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 mb-1 line-clamp-1 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors">
-        {card.title}
-      </h3>
-      <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed line-clamp-1">
-        {card.description || 'No description available.'}
-      </p>
-    </div>
-  </div>
-);

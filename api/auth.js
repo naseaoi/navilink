@@ -30,6 +30,8 @@ const hashPassword = (password) => {
   return `scrypt$${salt}$${hash}`;
 };
 
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
+
 const verifyPassword = (password, stored) => {
   if (!stored) return false;
   if (!stored.startsWith('scrypt$')) return password === stored;
@@ -94,7 +96,7 @@ export default async function handler(request, response) {
     const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : null;
     const payload = verifyToken(token, AUTH_SECRET);
     if (!payload) return response.status(401).json({ ok: false });
-    return response.json({ ok: true, exp: payload.exp });
+    return response.json({ ok: true, exp: payload.exp, mustChangePassword: !!payload.mustChangePassword });
   }
 
   if (request.method !== 'POST') {
@@ -121,10 +123,11 @@ export default async function handler(request, response) {
       await putWebDavJson('private.json', withTimestamp(upgraded), env);
     }
 
+    const mustChangePassword = verifyPassword(DEFAULT_ADMIN_PASSWORD, stored);
     const duration = remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     const exp = Date.now() + duration;
-    const token = signToken({ username, exp }, AUTH_SECRET);
-    return response.json({ token, exp });
+    const token = signToken({ username, exp, mustChangePassword }, AUTH_SECRET);
+    return response.json({ token, exp, mustChangePassword });
   } catch (error) {
     console.error('[Auth] Exception:', error);
     return response.status(500).json({ error: 'Auth Error', message: error.message });

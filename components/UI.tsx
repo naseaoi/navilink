@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Loader2, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -79,7 +80,7 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
         onClick={() => setIsOpen(!isOpen)}
         className="flex h-11 w-full items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm transition-all hover:border-stone-300 dark:bg-stone-950 dark:border-stone-800 dark:text-stone-100"
       >
-        <span className="truncate font-medium">{selectedOption?.label || 'Select...'}</span>
+        <span className="truncate font-medium">{selectedOption?.label || '请选择 Select...'}</span>
         <ChevronDown size={16} className={`text-stone-400 transition-transform duration-200 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       
@@ -106,9 +107,9 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
 // --- Modal ---
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
-  return (
+  return createPortal((
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-300"
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-stone-900/35 backdrop-blur-md animate-in fade-in duration-300"
       onClick={onClose}
     >
       <div 
@@ -126,7 +127,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 };
 
 // --- Card ---
@@ -138,9 +139,9 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string }> =
 
 export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; message: string; variant?: 'danger' | 'primary'; }> = ({ isOpen, onClose, onConfirm, title, message, variant = 'primary' }) => {
   if (!isOpen) return null;
-  return (
+  return createPortal((
     <div 
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[310] flex items-center justify-center p-4 bg-stone-900/35 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
@@ -150,12 +151,12 @@ export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onCo
         <h3 className="text-lg font-serif font-bold text-stone-900 dark:text-stone-100 mb-2">{title}</h3>
         <p className="text-stone-500 dark:text-stone-400 text-sm mb-8">{message}</p>
         <div className="flex gap-4">
-          <Button variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); onClose(); }}>Confirm</Button>
+          <Button variant="secondary" className="flex-1" onClick={onClose}>取消 Cancel</Button>
+          <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); onClose(); }}>确认 Confirm</Button>
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 };
 
 export type ToastType = 'success' | 'error' | 'info';

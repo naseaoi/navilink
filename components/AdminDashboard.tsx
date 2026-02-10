@@ -2,26 +2,28 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PublicData, PrivateData } from '../types';
 import { webdav } from '../services/webdavService';
 import { Button, ToastContainer, ToastMessage, ToastType, ConfirmModal } from './UI';
-import { Settings, Layout, Layers, LogOut, Save, Shield, Home, Menu, X, Database } from 'lucide-react';
+import { Menu, Save, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsTab } from './admin/SettingsTab';
 import { CardsTab } from './admin/CardsTab';
 import { CategoriesTab } from './admin/CategoriesTab';
 import { StorageTab } from './admin/StorageTab';
+import { AdminSidebar } from './admin/AdminSidebar';
+import { AdminTab, getAdminTabTitle } from './admin/adminLabels';
 
 interface AdminDashboardProps {
   publicData: PublicData;
   privateData: PrivateData;
+  mustChangePassword: boolean;
+  onPasswordPolicyResolved: () => void;
   onLogout: () => void;
   onUpdatePublic: (d: PublicData) => void;
   onUpdatePrivate: (d: PrivateData) => void;
 }
 
-type Tab = 'settings' | 'cards' | 'categories' | 'storage';
-
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, privateData, onLogout, onUpdatePublic, onUpdatePrivate }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, privateData, mustChangePassword, onPasswordPolicyResolved, onLogout, onUpdatePublic, onUpdatePrivate }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<Tab>('cards');
+  const [activeTab, setActiveTab] = useState<AdminTab>('cards');
   const [isSaving, setIsSaving] = useState(false);
   const [localPublic, setLocalPublic] = useState<PublicData>(publicData);
   const [localPrivate, setLocalPrivate] = useState<PrivateData>(privateData);
@@ -45,6 +47,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   };
 
   useEffect(() => { setLocalPublic(publicData); }, [publicData]);
+  useEffect(() => { setLocalPrivate(privateData); }, [privateData]);
+
+  const hasShownPolicyToast = useRef(false);
+  useEffect(() => {
+    if (!mustChangePassword) {
+      hasShownPolicyToast.current = false;
+      return;
+    }
+    setActiveTab('settings');
+    if (!hasShownPolicyToast.current) {
+      showToast('检测到默认密码，请先在“网站设置”中修改密码并保存', 'error');
+      hasShownPolicyToast.current = true;
+    }
+  }, [mustChangePassword, showToast]);
 
   useEffect(() => {
     const loadStorage = async () => {
@@ -120,12 +136,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   };
 
   const handleSave = async () => {
+    if (mustChangePassword && localPrivate.admin.passwordHash === privateData.admin.passwordHash) {
+      showToast('请先修改默认密码后再保存', 'error');
+      setActiveTab('settings');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await webdav.savePublicData(localPublic);
       await webdav.savePrivateData(localPrivate);
       onUpdatePublic(localPublic);
       onUpdatePrivate(localPrivate);
+      if (mustChangePassword) onPasswordPolicyResolved();
       setHasChanges(false);
       await refreshStorageStatus();
       showToast('设置保存成功', 'success');
@@ -135,33 +158,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   };
 
   const markChanged = () => setHasChanges(true);
-
-  // Sidebar Content
-  const SidebarContent = () => (
-    <>
-      <div className="p-8 border-b border-white/5 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-900 shadow-lg shadow-black/20 shrink-0">
-          <Shield size={20} />
-        </div>
-        <div>
-          <span className="font-serif font-bold text-stone-100 block text-lg leading-tight tracking-tight">NaviLink</span>
-          <span className="text-[10px] uppercase tracking-widest text-stone-500 font-medium">Admin Panel</span>
-        </div>
-      </div>
-      
-      <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
-        <NavButton active={activeTab === 'cards'} onClick={() => {setActiveTab('cards'); setIsMobileMenuOpen(false);}} icon={<Layout size={18} />} label="卡片管理" />
-        <NavButton active={activeTab === 'categories'} onClick={() => {setActiveTab('categories'); setIsMobileMenuOpen(false);}} icon={<Layers size={18} />} label="分类管理" />
-        <NavButton active={activeTab === 'settings'} onClick={() => {setActiveTab('settings'); setIsMobileMenuOpen(false);}} icon={<Settings size={18} />} label="网站设置" />
-        <NavButton active={activeTab === 'storage'} onClick={() => {setActiveTab('storage'); setIsMobileMenuOpen(false);}} icon={<Database size={18} />} label="数据存储" />
-      </nav>
-
-      <div className="p-6 border-t border-white/5 space-y-2">
-        <FooterButton onClick={() => navigate('/')} icon={<Home size={18} />} label="返回首页" />
-        <FooterButton onClick={onLogout} icon={<LogOut size={18} />} label="退出登录" tone="danger" />
-      </div>
-    </>
-  );
 
   return (
     <div className="fixed inset-0 h-screen w-screen flex flex-col md:flex-row bg-[#fafaf9] dark:bg-[#1c1917] overflow-hidden font-sans text-stone-800 dark:text-stone-200">
@@ -173,7 +169,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-72 bg-[#292524] text-stone-400 flex-col flex-shrink-0 z-30 dark:bg-[#0c0a09] dark:border-r dark:border-stone-800">
-        <SidebarContent />
+        <AdminSidebar
+          activeTab={activeTab}
+          mustChangePassword={mustChangePassword}
+          onTabChange={setActiveTab}
+          onGoHome={() => navigate('/')}
+          onLogout={onLogout}
+        />
       </aside>
 
       {/* Mobile Sidebar Overlay */}
@@ -182,7 +184,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
           <aside className="relative w-72 bg-[#292524] text-stone-400 flex flex-col h-full shadow-2xl animate-in slide-in-from-left duration-300">
              <button className="absolute top-4 right-4 p-2 text-stone-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}><X size={20}/></button>
-             <SidebarContent />
+             <AdminSidebar
+               activeTab={activeTab}
+               mustChangePassword={mustChangePassword}
+               onTabChange={setActiveTab}
+               onGoHome={() => navigate('/')}
+               onLogout={onLogout}
+               onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+             />
           </aside>
         </div>
       )}
@@ -194,7 +203,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
                <Menu size={24} />
              </button>
             <h2 className="text-xl md:text-3xl font-serif font-bold text-stone-900 dark:text-stone-100 tracking-tight">
-             {activeTab === 'cards' ? 'Cards' : activeTab === 'categories' ? 'Categories' : activeTab === 'storage' ? 'Storage' : 'Settings'}
+             {getAdminTabTitle(activeTab)}
             </h2>
           </div>
           
@@ -209,6 +218,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
             <Save size={20} />
           </Button>
         </header>
+
+        {mustChangePassword && (
+          <div className="mx-4 mt-4 md:mx-10 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+            当前账号仍在使用默认密码，请在“网站设置”中修改密码并保存后再进行其他操作。
+          </div>
+        )}
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
            <div className="max-w-7xl mx-auto space-y-8 pb-32">
@@ -239,22 +254,3 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
     </div>
   );
 };
-
-const NavButton = ({ active, onClick, icon, label }: any) => (
-  <button onClick={onClick} className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl text-sm font-medium transition-all ${active ? 'bg-stone-100 text-stone-900 shadow-lg shadow-black/5' : 'text-stone-500 hover:text-stone-200 hover:bg-white/5'}`}>
-    {icon}{label}
-  </button>
-);
-
-const FooterButton = ({ onClick, icon, label, tone = 'default' }: any) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl text-sm font-medium transition-all ${
-      tone === 'danger'
-        ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10'
-        : 'text-stone-500 hover:text-stone-200 hover:bg-white/5'
-    }`}
-  >
-    {icon}{label}
-  </button>
-);

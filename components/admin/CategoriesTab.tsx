@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Edit2, Trash2, Plus } from 'lucide-react';
 import { Button, Input } from '../UI';
 import { Category, LinkCard, PublicData } from '../../types';
@@ -12,6 +12,10 @@ interface CategoriesTabProps {
 export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, confirm }) => {
   const [editId, setEditId] = useState<string | null>(null);
   const [tmpName, setTmpName] = useState('');
+  const sortedCategories = useMemo(
+    () => [...data.categories].sort((a, b) => a.order - b.order),
+    [data.categories]
+  );
 
   const addCategory = () => {
     const newCategory: Category = {
@@ -48,7 +52,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
         <Button variant="secondary" size="sm" onClick={addCategory}><Plus size={16}/> 新增</Button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {data.categories.sort((a: Category, b: Category) => a.order - b.order).map((c: Category) => (
+        {sortedCategories.map((c: Category) => (
           <div key={c.id} className="flex items-center gap-3 p-4 bg-white rounded-xl border border-stone-200 dark:bg-stone-900 dark:border-stone-800">
             {editId === c.id ? (
               <>

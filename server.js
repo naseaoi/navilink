@@ -12,9 +12,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const DIST_DIR = path.join(__dirname, 'dist');
+const DIST_ASSETS_DIR = path.join(DIST_DIR, 'assets');
 const STORAGE_CONFIG_PATH = path.join(DATA_DIR, 'storage.json');
 const AUTH_SECRET_PATH = path.join(DATA_DIR, '.auth_secret');
 let AUTH_SECRET = process.env.AUTH_SECRET || '';
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const LOGIN_WINDOW_MS = Number(process.env.LOGIN_WINDOW_MS || 60_000);
+const LOGIN_MAX_ATTEMPTS = Number(process.env.LOGIN_MAX_ATTEMPTS || 5);
 
 // WebDAV 配置 (如果存在则优先使用代理模式)
 const { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH } = process.env;
@@ -22,10 +30,45 @@ const USE_WEBDAV = !!(WEBDAV_URL && WEBDAV_USERNAME && WEBDAV_PASSWORD);
 
 const app = express();
 
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (CORS_ORIGINS.length === 0) return callback(null, true);
+    if (CORS_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // 中间件
-app.use(cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' })); // 支持大 JSON 数据
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  return next();
+});
+app.use('/assets', express.static(DIST_ASSETS_DIR, {
+  immutable: true,
+  maxAge: '1y'
+}));
+app.use(express.static(DIST_DIR, {
+  etag: true,
+  lastModified: true,
+  maxAge: '1h',
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }
+}));
+app.use((err, req, res, next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS origin denied' });
+  }
+  return next(err);
+});
 
 // 确保数据目录存在
 if (!existsSync(DATA_DIR)) {
@@ -139,6 +182,47 @@ const DEFAULT_PRIVATE_DATA = {
     username: 'admin',
     passwordHash: hashPassword('admin123')
   }
+};
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
+
+const loginAttempts = new Map();
+
+const getClientIp = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+};
+
+const getLoginRateKey = (req, username) => `${getClientIp(req)}:${(username || '').toLowerCase()}`;
+
+const getRateLimitState = (key) => {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry) return { limited: false, retryAfterSeconds: 0 };
+  if (now - entry.firstFailedAt > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return { limited: false, retryAfterSeconds: 0 };
+  }
+  if (entry.count < LOGIN_MAX_ATTEMPTS) return { limited: false, retryAfterSeconds: 0 };
+  const retryAfterMs = Math.max(0, LOGIN_WINDOW_MS - (now - entry.firstFailedAt));
+  return { limited: true, retryAfterSeconds: Math.ceil(retryAfterMs / 1000) };
+};
+
+const recordLoginFailure = (key) => {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.firstFailedAt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, firstFailedAt: now });
+    return;
+  }
+  entry.count += 1;
+  loginAttempts.set(key, entry);
+};
+
+const clearLoginFailures = (key) => {
+  loginAttempts.delete(key);
 };
 
 const readLocalJson = async (filePath) => {
@@ -296,6 +380,12 @@ async function handleLocalStorage(req, res, fileName) {
 app.post('/api/auth/login', async (req, res) => {
   const { username, password, remember } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+  const rateKey = getLoginRateKey(req, username);
+  const rateState = getRateLimitState(rateKey);
+  if (rateState.limited) {
+    res.set('Retry-After', String(rateState.retryAfterSeconds));
+    return res.status(429).json({ error: 'Too many login attempts, please try again later' });
+  }
 
   try {
     let privateData = null;
@@ -318,8 +408,12 @@ app.post('/api/auth/login', async (req, res) => {
     const stored = privateData?.admin?.passwordHash || '';
     const isValid = verifyPassword(password, stored);
     if (!isValid || privateData?.admin?.username !== username) {
+      recordLoginFailure(rateKey);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    clearLoginFailures(rateKey);
+    const mustChangePassword = verifyPassword(DEFAULT_ADMIN_PASSWORD, stored);
 
     if (stored && !stored.startsWith('scrypt$')) {
       const upgraded = normalizePrivateData(privateData);
@@ -330,8 +424,8 @@ app.post('/api/auth/login', async (req, res) => {
 
     const duration = remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     const exp = Date.now() + duration;
-    const token = signToken({ username, exp });
-    return res.json({ token, exp });
+    const token = signToken({ username, exp, mustChangePassword });
+    return res.json({ token, exp, mustChangePassword });
   } catch (error) {
     console.error(`[Auth Error] ${error.message}`);
     return res.status(500).json({ error: 'Auth Error' });
@@ -342,7 +436,7 @@ app.get('/api/auth/verify', (req, res) => {
   const token = getAuthToken(req);
   const payload = verifyToken(token);
   if (!payload) return res.status(401).json({ ok: false });
-  return res.json({ ok: true, exp: payload.exp });
+  return res.json({ ok: true, exp: payload.exp, mustChangePassword: !!payload.mustChangePassword });
 });
 
 app.get('/api/storage/mode', async (req, res) => {

@@ -9,6 +9,21 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/lucide-react')) {
+              return 'icon-vendor';
+            }
+            return undefined;
+          }
+        }
+      }
+    },
     define: {
       // Polyfill process.env for the webdavService
       'process.env.WEBDAV_URL': JSON.stringify(env.WEBDAV_URL),

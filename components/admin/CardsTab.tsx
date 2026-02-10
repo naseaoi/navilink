@@ -3,6 +3,26 @@ import { Edit2, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { Button, Input, Modal, Select } from '../UI';
 import { LinkCard, PublicData } from '../../types';
 
+const FALLBACK_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="#E7E5E4"/><rect x="16" y="18" width="32" height="28" rx="6" stroke="#78716C" stroke-width="3"/><circle cx="26" cy="28" r="3" fill="#78716C"/><path d="M20 42l9-9 6 6 5-5 8 8" stroke="#78716C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+)}`;
+
+const resolveIconSrc = (icon?: string) => (icon && icon.trim() ? icon : FALLBACK_ICON);
+
+const handleIconError = (event: React.SyntheticEvent<HTMLImageElement, Event>, url: string) => {
+  const target = event.currentTarget;
+  if (target.dataset.fallback === 'favicon') {
+    target.src = FALLBACK_ICON;
+    return;
+  }
+  try {
+    target.src = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`;
+    target.dataset.fallback = 'favicon';
+  } catch {
+    target.src = FALLBACK_ICON;
+  }
+};
+
 interface CardsTabProps {
   data: PublicData;
   onChange: (data: PublicData) => void;
@@ -43,7 +63,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
     onChange({ ...data, cards: allCards });
   };
 
-  const handleTouchStart = (e: React.TouchEvent, id: string) => {
+  const handleTouchStart = (_e: React.TouchEvent, id: string) => {
     setDraggedId(id);
   };
 
@@ -63,7 +83,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   };
 
   const handleTouchEnd = () => {
-    const reindexed = data.cards
+    const reindexed = [...data.cards]
       .sort((a: LinkCard, b: LinkCard) => a.order - b.order)
       .map((card: LinkCard, index: number) => ({ ...card, order: index }));
     onChange({ ...data, cards: reindexed });
@@ -134,10 +154,12 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
 
             <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800 group-hover:scale-105 transition-transform duration-300">
               <img 
-                src={card.icon} 
+                src={resolveIconSrc(card.icon)} 
                 className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
-                onError={e=>{ try { (e.target as any).src=`https://www.google.com/s2/favicons?domain=${new URL(card.url).hostname}&sz=128` } catch {} }}
-                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={(e) => handleIconError(e, card.url)}
+                alt={card.title}
               />
             </div>
 
