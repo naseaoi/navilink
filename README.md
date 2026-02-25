@@ -25,6 +25,26 @@ NaviLink 是一个现代化的、极简风格的导航网站。它采用卡片�
 
 ---
 
+## GitHub 自动构建 Docker 镜像
+
+仓库已包含 GitHub Actions 工作流：`.github/workflows/docker-image.yml`。
+
+触发规则：
+
+*   推送到 `main` 或 `master`
+*   推送 `v*` 标签（如 `v1.0.2`）
+*   手动触发（Actions -> Run workflow）
+
+产物：
+
+*   镜像会自动推送到 `ghcr.io/<owner>/<repo>`
+*   默认分支会额外打 `latest` 标签
+*   同时包含分支名/标签名和 `sha` 标签
+
+首次使用请确认仓库设置允许 Actions 写入 Packages（`GITHUB_TOKEN`）。
+
+---
+
 ## 部署方式 2：VPS 手动部署 (Node.js)
 
 1.  确保服务器安装了 Node.js 18+。
