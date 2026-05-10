@@ -160,7 +160,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   const markChanged = () => setHasChanges(true);
 
   return (
-    <div className="fixed inset-0 h-screen w-screen flex flex-col md:flex-row bg-[#fafaf9] dark:bg-[#1c1917] overflow-hidden font-sans text-stone-800 dark:text-stone-200">
+    <div className="fixed inset-0 h-screen w-screen flex flex-col md:flex-row bg-canvas overflow-hidden font-sans text-1">
       <ToastContainer messages={toasts} onRemove={removeToast} />
       <ConfirmModal 
         isOpen={confirmConfig.isOpen} onClose={() => setConfirmConfig(p=>({...p, isOpen: false}))} 
@@ -168,7 +168,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
       />
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-72 bg-[#292524] text-stone-400 flex-col flex-shrink-0 z-30 dark:bg-[#0c0a09] dark:border-r dark:border-stone-800">
+      <aside className="hidden md:flex w-72 bg-surface-raised border-r border-subtle flex-col flex-shrink-0 z-30">
         <AdminSidebar
           activeTab={activeTab}
           mustChangePassword={mustChangePassword}
@@ -182,8 +182,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-          <aside className="relative w-72 bg-[#292524] text-stone-400 flex flex-col h-full shadow-2xl animate-in slide-in-from-left duration-300">
-             <button className="absolute top-4 right-4 p-2 text-stone-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}><X size={20}/></button>
+          <aside className="relative w-72 bg-surface-raised border-r border-subtle flex flex-col h-full shadow-popover animate-in slide-in-from-left duration-300">
+             <button className="absolute top-4 right-4 w-9 h-9 rounded-control flex items-center justify-center text-2 hover:text-1 hover:bg-subtle transition-colors" onClick={() => setIsMobileMenuOpen(false)}><X size={20}/></button>
              <AdminSidebar
                activeTab={activeTab}
                mustChangePassword={mustChangePassword}
@@ -196,23 +196,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#fafaf9] dark:bg-[#1c1917]">
-        <header className="flex-shrink-0 flex justify-between items-center p-4 md:px-10 md:py-6 bg-[#fafaf9]/80 backdrop-blur-md border-b border-stone-200 dark:bg-[#1c1917]/80 dark:border-stone-800">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-canvas">
+        <header className="flex-shrink-0 flex justify-between items-center p-4 md:px-10 md:py-6 bg-canvas/75 backdrop-blur-xl border-b border-subtle/70">
           <div className="flex items-center gap-3">
-             <button className="md:hidden p-2 -ml-2 text-stone-600 dark:text-stone-300" onClick={() => setIsMobileMenuOpen(true)}>
+             <button className="md:hidden w-9 h-9 -ml-1 rounded-control flex items-center justify-center text-2 hover:bg-subtle hover:text-1 transition-colors" onClick={() => setIsMobileMenuOpen(true)}>
                <Menu size={24} />
              </button>
-            <h2 className="text-xl md:text-3xl font-serif font-bold text-stone-900 dark:text-stone-100 tracking-tight">
-             {getAdminTabTitle(activeTab)}
+            <h2 className="text-xl md:text-[28px] font-semibold tracking-tight-display text-1">
+              {getAdminTabTitle(activeTab)}
             </h2>
           </div>
-          
+
           <Button 
             onClick={handleSave} 
             disabled={!hasChanges} 
             isLoading={isSaving} 
             size="icon" 
-            className="rounded-full w-12 h-12 shadow-xl shadow-stone-900/10"
+            className="rounded-control w-11 h-11"
             title="保存更改"
           >
             <Save size={20} />
@@ -220,7 +220,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         </header>
 
         {mustChangePassword && (
-          <div className="mx-4 mt-4 md:mx-10 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+          <div className="mx-4 mt-4 md:mx-10 rounded-card border border-amber-200 bg-amber-50/85 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
             当前账号仍在使用默认密码，请在“网站设置”中修改密码并保存后再进行其他操作。
           </div>
         )}

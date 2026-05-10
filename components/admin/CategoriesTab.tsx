@@ -48,12 +48,12 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">分类列表</span>
+        <span className="text-xs font-bold text-3 uppercase tracking-widest">分类列表</span>
         <Button variant="secondary" size="sm" onClick={addCategory}><Plus size={16}/> 新增</Button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {sortedCategories.map((c: Category) => (
-          <div key={c.id} className="flex items-center gap-3 p-4 bg-white rounded-xl border border-stone-200 dark:bg-stone-900 dark:border-stone-800">
+          <div key={c.id} className="flex items-center gap-3 p-4 bg-surface-raised rounded-card border border-subtle shadow-soft">
             {editId === c.id ? (
               <>
                 <div className="flex-1 min-w-0">
@@ -63,10 +63,10 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
               </>
             ) : (
               <>
-                <span className="flex-1 font-bold text-stone-700 dark:text-stone-300 truncate">{c.name}</span>
+                <span className="flex-1 font-semibold text-1 truncate">{c.name}</span>
                 <div className="flex gap-1">
-                  <button onClick={() => handleEdit(c)} className="p-2 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-600 transition-colors"><Edit2 size={16}/></button>
-                  <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-lg text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                  <button onClick={() => handleEdit(c)} className="p-2 hover:bg-subtle rounded-md text-3 hover:text-1 transition-colors"><Edit2 size={16}/></button>
+                  <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-md text-3 hover:text-red-500 transition-colors dark:hover:bg-red-950/30"><Trash2 size={16}/></button>
                 </div>
               </>
             )}

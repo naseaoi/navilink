@@ -18,7 +18,7 @@
 |:---|:---|:---|
 | React 18 + TypeScript | Express 4 (Node.js) | Vite 5 |
 | Tailwind CSS 3 | JSON 文件存储 / WebDAV | Docker 多阶段构建 |
-| react-router-dom v6 | scrypt + HMAC-SHA256 鉴权 | GitHub Actions CI |
+| react-router-dom v6 | scrypt + HMAC-SHA256 鉴权 | GitHub Actions GHCR 镜像发布 |
 
 ## 快速开始
 
@@ -35,6 +35,11 @@ cd navilink
 npm install
 npm run dev
 ```
+
+`npm run dev` 会同时启动：
+
+- Vite 前端开发服务器：`http://localhost:5173`
+- 本地 API / 数据服务：`http://localhost:3000`
 
 ### 生产构建
 
@@ -102,25 +107,34 @@ pm2 start server.js --name navilink
 
 | 变量 | 必填 | 默认值 | 说明 |
 |:---|:---|:---|:---|
-| `AUTH_SECRET` | 是 | 自动生成 | Token 签名密钥 |
+| `AUTH_SECRET` | 否 | 自动生成 | Token 签名密钥；生产环境强烈建议显式设置 |
 | `PORT` | 否 | `3000` | 服务端口 |
 | `DATA_DIR` | 否 | `./data` | 本地数据存储路径 |
 | `WEBDAV_URL` | WebDAV 模式 | - | WebDAV 服务器地址 |
 | `WEBDAV_USERNAME` | WebDAV 模式 | - | WebDAV 用户名 |
 | `WEBDAV_PASSWORD` | WebDAV 模式 | - | WebDAV 密码 |
-| `WEBDAV_PATH` | 否 | `/navilink` | WebDAV 存储路径 |
+| `WEBDAV_PATH` | 否 | `navilink` | WebDAV 存储路径 |
 | `CORS_ORIGINS` | 否 | 空（允许所有） | 允许的跨域来源，逗号分隔 |
 | `LOGIN_WINDOW_MS` | 否 | `60000` | 登录限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 窗口内最大登录失败次数 |
 
-未设置 `WEBDAV_URL` 时自动使用本地文件存储模式。生产环境建议配置 `CORS_ORIGINS`。
+未设置 `WEBDAV_URL` 时自动使用本地文件存储模式。Vercel 环境下 `AUTH_SECRET` 为必填，生产环境建议配置 `AUTH_SECRET` 与 `CORS_ORIGINS`。
 
 ## 使用说明
 
+开发模式：
+
+- 首页：`http://localhost:5173`
+- 管理后台：`http://localhost:5173/tat`
+
+生产模式：
+
 - 首页：`http://localhost:3000`
 - 管理后台：`http://localhost:3000/tat`
-  - 默认账号：`admin` / `admin123`
-  - 首次登录会强制要求修改默认密码
+
+默认账号：`admin` / `admin123`
+
+- 首次登录会强制要求修改默认密码
 
 ## 项目结构
 

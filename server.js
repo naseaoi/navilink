@@ -564,6 +564,53 @@ async function handleWebDAVProxy(req, res, fileName) {
   }
 }
 
+// 图标代理:绕过浏览器跨域限制,让前端可以 fetch + IndexedDB 缓存
+// 仅允许 http/https 协议、限制响应大小 5MB,内置 CDN 强缓存
+app.get('/api/icon-proxy', async (req, res) => {
+  const target = String(req.query.url || '').trim();
+  if (!target) return res.status(400).json({ error: 'missing url' });
+
+  let parsed;
+  try {
+    parsed = new URL(target);
+  } catch {
+    return res.status(400).json({ error: 'invalid url' });
+  }
+  if (!/^https?:$/.test(parsed.protocol)) {
+    return res.status(400).json({ error: 'unsupported protocol' });
+  }
+
+  try {
+    const upstream = await fetch(parsed.toString(), {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'NaviLink-IconProxy/1.0',
+        'Accept': 'image/*,*/*;q=0.8'
+      }
+    });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: `upstream ${upstream.status}` });
+    }
+    const contentType = upstream.headers.get('content-type') || 'image/png';
+    if (!/^image\//i.test(contentType) && !/octet-stream/i.test(contentType)) {
+      return res.status(415).json({ error: 'not an image' });
+    }
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    if (buf.length > 5 * 1024 * 1024) {
+      return res.status(413).json({ error: 'too large' });
+    }
+    res.set('Content-Type', contentType);
+    // 提示浏览器与 IndexedDB 缓存:30 天 immutable
+    res.set('Cache-Control', 'public, max-age=2592000, immutable');
+    res.set('Access-Control-Allow-Origin', '*');
+    return res.send(buf);
+  } catch (error) {
+    console.error(`[Icon Proxy] ${target} -> ${error.message}`);
+    return res.status(502).json({ error: 'fetch failed' });
+  }
+});
+
 // 所有其他路由返回 index.html (SPA 支持)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));

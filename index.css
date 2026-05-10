@@ -2,59 +2,178 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================
+ * 设计令牌 (Design Tokens)
+ * 新中性风格 - 冷灰阶 + 精细阴影 + 微 accent
+ * =========================== */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --border: 214.3 31.8% 91.4%;
-  }
- 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
+    /* 表面 / 背景 - 冷调中性灰 */
+    --bg-canvas: 250 250 251;          /* 页面底色 */
+    --bg-surface: 255 255 255;         /* 卡片表面 */
+    --bg-surface-raised: 255 255 255;  /* 浮起表面(modal/popover) */
+    --bg-subtle: 244 244 246;          /* 次级背景(tab/input bg) */
+
+    /* 边框层级 */
+    --border-subtle: 229 231 235;      /* 卡片/输入静态 */
+    --border-default: 209 213 219;     /* hover/focus */
+    --border-strong: 156 163 175;
+
+    /* 文本层级 */
+    --text-1: 17 24 39;                /* 主要 */
+    --text-2: 75 85 99;                /* 次要 */
+    --text-3: 156 163 175;             /* 弱化 */
+    --text-inverse: 255 255 255;
+
+    /* Accent (低饱和靛蓝,作为单点强调) */
+    --accent: 79 70 229;
+    --accent-hover: 67 56 202;
+    --accent-soft: 238 242 255;
+
+    /* 圆角语义化 */
+    --radius-control: 10px;
+    --radius-card: 16px;
+    --radius-modal: 20px;
+    --radius-pill: 9999px;
   }
 
-  /* Custom scrollbar */
+  .dark {
+    --bg-canvas: 10 10 12;
+    --bg-surface: 22 22 26;
+    --bg-surface-raised: 28 28 33;
+    --bg-subtle: 32 32 38;
+
+    --border-subtle: 40 40 48;
+    --border-default: 60 60 70;
+    --border-strong: 90 90 105;
+
+    --text-1: 245 245 247;
+    --text-2: 180 183 192;
+    --text-3: 120 124 135;
+    --text-inverse: 17 24 39;
+
+    --accent: 129 140 248;
+    --accent-hover: 165 180 252;
+    --accent-soft: 30 27 75;
+  }
+
+  body {
+    background-color: rgb(var(--bg-canvas));
+    color: rgb(var(--text-1));
+  }
+
+  /* 全局滚动条 - 极细、半透明 */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
+    background: rgb(var(--border-default) / 0.6);
+    border-radius: 4px;
+    transition: background 0.2s ease;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: rgb(var(--border-strong) / 0.8);
   }
-  
-  @media (prefers-color-scheme: dark) {
-    ::-webkit-scrollbar-thumb {
-      background: #475569;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #64748b;
-    }
+
+  /* 全局焦点 */
+  *:focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.55);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
+/* ===========================
+ * 工具类
+ * =========================== */
 @layer utilities {
+  /* 隐藏滚动条但保留可滚动 */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 多层精细阴影 - 现代精致感 */
+  .shadow-soft {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 1px 0 rgb(0 0 0 / 0.02);
+  }
+  .shadow-card {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.05),
+      0 4px 12px -2px rgb(0 0 0 / 0.04);
+  }
+  .shadow-card-hover {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.06),
+      0 12px 24px -8px rgb(0 0 0 / 0.10),
+      0 4px 8px -4px rgb(0 0 0 / 0.06);
+  }
+  .shadow-popover {
+    box-shadow:
+      0 4px 8px -2px rgb(0 0 0 / 0.06),
+      0 16px 32px -8px rgb(0 0 0 / 0.10),
+      0 24px 48px -12px rgb(0 0 0 / 0.08);
+  }
+  .dark .shadow-soft,
+  .dark .shadow-card,
+  .dark .shadow-card-hover,
+  .dark .shadow-popover {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.4),
+      0 8px 24px -4px rgb(0 0 0 / 0.4);
+  }
+
+  /* 表面色 - 配合 CSS 变量 */
+  .bg-canvas { background-color: rgb(var(--bg-canvas)); }
+  .bg-surface { background-color: rgb(var(--bg-surface)); }
+  .bg-surface-raised { background-color: rgb(var(--bg-surface-raised)); }
+  .bg-subtle { background-color: rgb(var(--bg-subtle)); }
+  .border-subtle { border-color: rgb(var(--border-subtle)); }
+  .border-default { border-color: rgb(var(--border-default)); }
+  .text-1 { color: rgb(var(--text-1)); }
+  .text-2 { color: rgb(var(--text-2)); }
+  .text-3 { color: rgb(var(--text-3)); }
+  .text-accent { color: rgb(var(--accent)); }
+  .bg-accent { background-color: rgb(var(--accent)); }
+  .bg-accent-soft { background-color: rgb(var(--accent-soft)); }
+
+  /* 卡片入场 - 更柔和的 spring 曲线 */
   .animate-card-enter {
     opacity: 0;
-    animation: card-enter 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    animation: card-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
-  
+
   @keyframes card-enter {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(12px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  /* shimmer - 加载骨架屏 */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--bg-subtle)) 0%,
+      rgb(var(--border-subtle)) 50%,
+      rgb(var(--bg-subtle)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
   }
 }

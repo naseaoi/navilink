@@ -17,34 +17,47 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ title, icon, theme, 
     return Monitor;
   }, [theme]);
 
+  const themeLabel = theme === 'dark' ? '深色' : theme === 'light' ? '浅色' : '跟随系统';
+  const iconButtonClass = 'w-9 h-9 rounded-pill flex items-center justify-center text-2 hover:bg-subtle hover:text-1 transition-colors';
+
   return (
-    <header className="sticky top-0 z-40 bg-[#fafaf9]/80 dark:bg-[#1c1917]/80 backdrop-blur-md border-b border-stone-200/50 dark:border-stone-800/50 transition-all">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-        <div className="flex items-center gap-3 select-none cursor-default" onClick={onTitleClick}>
-          <div className="w-10 h-10 bg-stone-900 dark:bg-stone-100 rounded-xl flex items-center justify-center text-white dark:text-stone-900 shadow-xl shadow-stone-900/10">
-            {icon && !icon.startsWith('http') ? <span className="text-lg">{icon}</span> : <Compass size={20} />}
+    <header className="sticky top-0 z-40 bg-canvas/75 backdrop-blur-xl border-b border-subtle/70 transition-all">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        {/* Logo + 标题 */}
+        <div className="flex items-center gap-3 select-none cursor-default group" onClick={onTitleClick}>
+          <div className="w-9 h-9 rounded-control bg-1 flex items-center justify-center
+            shadow-soft transition-transform duration-300 ease-spring group-active:scale-95
+            bg-gradient-to-br from-stone-900 to-stone-700 dark:from-stone-100 dark:to-stone-300
+            text-white dark:text-stone-900">
+            {icon && !icon.startsWith('http') ? (
+              <span className="text-base">{icon}</span>
+            ) : (
+              <Compass size={18} strokeWidth={2.2} />
+            )}
           </div>
-          <h1 className="text-2xl font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100">{title}</h1>
+          <h1 className="text-[17px] font-semibold tracking-tight-display text-1">{title}</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* 操作区 */}
+        <div className="flex items-center gap-2">
           <button
             onClick={onSearchOpen}
-            className="w-10 h-10 rounded-full hover:bg-stone-200/50 dark:hover:bg-stone-800 flex items-center justify-center transition-colors text-stone-600 dark:text-stone-400"
-            aria-label="Search"
-            title="Search (Cmd+K)"
+            className={iconButtonClass}
+            aria-label="搜索"
+            title="搜索 (Ctrl/Cmd+K)"
           >
-            <Search size={22} />
+            <Search size={18} strokeWidth={2.2} />
           </button>
 
+          {/* 主题切换 */}
           {onToggleTheme && (
             <button
               onClick={onToggleTheme}
-              className="w-10 h-10 rounded-full hover:bg-stone-200/50 dark:hover:bg-stone-800 flex items-center justify-center transition-colors text-stone-600 dark:text-stone-400"
-              aria-label="Switch Theme"
-              title={`Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`}
+              className={iconButtonClass}
+              aria-label="切换主题"
+              title={`主题:${themeLabel}`}
             >
-              <ThemeIcon size={22} />
+              <ThemeIcon size={17} strokeWidth={2.2} />
             </button>
           )}
         </div>

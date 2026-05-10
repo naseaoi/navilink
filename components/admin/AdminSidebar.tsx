@@ -12,7 +12,7 @@ interface AdminSidebarProps {
 }
 
 const NavButton = ({ active, onClick, icon, label, disabled = false }: any) => (
-  <button disabled={disabled} onClick={onClick} className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl text-sm font-medium transition-all ${active ? 'bg-stone-100 text-stone-900 shadow-lg shadow-black/5' : 'text-stone-500 hover:text-stone-200 hover:bg-white/5'} ${disabled ? 'opacity-40 cursor-not-allowed hover:text-stone-500 hover:bg-transparent' : ''}`}>
+  <button disabled={disabled} onClick={onClick} className={`w-full flex items-center gap-4 px-4 py-3 rounded-control text-sm font-medium transition-all border ${active ? 'bg-subtle text-1 border-default shadow-soft' : 'text-2 border-transparent hover:text-1 hover:bg-subtle hover:border-subtle'} ${disabled ? 'opacity-40 cursor-not-allowed hover:text-2 hover:bg-transparent hover:border-transparent' : ''}`}>
     {icon}{label}
   </button>
 );
@@ -20,10 +20,10 @@ const NavButton = ({ active, onClick, icon, label, disabled = false }: any) => (
 const FooterButton = ({ onClick, icon, label, tone = 'default' }: any) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl text-sm font-medium transition-all ${
+    className={`w-full flex items-center gap-4 px-4 py-3 rounded-control text-sm font-medium transition-all border border-transparent ${
       tone === 'danger'
-        ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10'
-        : 'text-stone-500 hover:text-stone-200 hover:bg-white/5'
+        ? 'text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'
+        : 'text-2 hover:text-1 hover:bg-subtle hover:border-subtle'
     }`}
   >
     {icon}{label}
@@ -45,24 +45,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
   return (
     <>
-      <div className="p-8 border-b border-white/5 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-900 shadow-lg shadow-black/20 shrink-0">
+      <div className="p-7 border-b border-subtle flex items-center gap-4">
+        <div className="w-10 h-10 rounded-pill flex items-center justify-center text-white dark:text-stone-900 shadow-soft shrink-0 bg-gradient-to-br from-stone-900 to-stone-700 dark:from-stone-100 dark:to-stone-300">
           <Shield size={20} />
         </div>
         <div>
-          <span className="font-serif font-bold text-stone-100 block text-lg leading-tight tracking-tight">NaviLink</span>
-          <span className="text-[10px] uppercase tracking-widest text-stone-500 font-medium">管理后台 Admin Panel</span>
+          <span className="font-semibold text-1 block text-lg leading-tight tracking-tight-display">NaviLink</span>
+          <span className="text-[10px] uppercase tracking-widest text-3 font-medium">管理后台 Admin Panel</span>
         </div>
       </div>
 
-      <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
+      <nav className="flex-1 p-5 space-y-2 overflow-y-auto">
         <NavButton active={activeTab === 'cards'} disabled={mustChangePassword} onClick={() => switchTab('cards')} icon={<Layout size={18} />} label="卡片管理" />
         <NavButton active={activeTab === 'categories'} disabled={mustChangePassword} onClick={() => switchTab('categories')} icon={<Layers size={18} />} label="分类管理" />
         <NavButton active={activeTab === 'settings'} onClick={() => switchTab('settings')} icon={<Settings size={18} />} label="网站设置" />
         <NavButton active={activeTab === 'storage'} disabled={mustChangePassword} onClick={() => switchTab('storage')} icon={<Database size={18} />} label="数据存储" />
       </nav>
 
-      <div className="p-6 border-t border-white/5 space-y-2">
+      <div className="p-5 border-t border-subtle space-y-2">
         <FooterButton onClick={onGoHome} icon={<Home size={18} />} label="返回首页" />
         <FooterButton onClick={onLogout} icon={<LogOut size={18} />} label="退出登录" tone="danger" />
       </div>

@@ -1,26 +1,7 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { LinkCard } from '../../types';
-
-const FALLBACK_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="#E7E5E4"/><rect x="16" y="18" width="32" height="28" rx="6" stroke="#78716C" stroke-width="3"/><circle cx="26" cy="28" r="3" fill="#78716C"/><path d="M20 42l9-9 6 6 5-5 8 8" stroke="#78716C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-)}`;
-
-const resolveIconSrc = (icon?: string) => (icon && icon.trim() ? icon : FALLBACK_ICON);
-
-const handleIconError = (event: React.SyntheticEvent<HTMLImageElement, Event>, url: string) => {
-  const target = event.currentTarget;
-  if (target.dataset.fallback === 'favicon') {
-    target.src = FALLBACK_ICON;
-    return;
-  }
-  try {
-    target.src = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`;
-    target.dataset.fallback = 'favicon';
-  } catch {
-    target.src = FALLBACK_ICON;
-  }
-};
+import { CachedIcon } from './CachedIcon';
 
 interface CardGridProps {
   cards: LinkCard[];
@@ -32,19 +13,22 @@ interface CardGridProps {
 export const CardGrid: React.FC<CardGridProps> = ({ cards, selectedCategory, gridRenderKey, onCardClick }) => {
   return (
     <main className="w-full max-w-7xl mx-auto px-4 py-8 pb-20 flex-1">
-      <div key={`${selectedCategory}-${gridRenderKey}`} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+      <div
+        key={`${selectedCategory}-${gridRenderKey}`}
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5"
+      >
         {cards.map((card, index) => (
           <CardItem
             key={card.id}
             card={card}
             onClick={() => onCardClick(card)}
-            style={{ animationDelay: `${index * 50}ms` }}
+            style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
             className="animate-card-enter"
           />
         ))}
         {cards.length === 0 && (
           <div className="col-span-full py-24 text-center animate-card-enter">
-            <p className="text-stone-400 font-serif italic text-lg">No treasures found.</p>
+            <p className="text-3 text-base">暂无匹配内容</p>
           </div>
         )}
       </div>
@@ -52,31 +36,46 @@ export const CardGrid: React.FC<CardGridProps> = ({ cards, selectedCategory, gri
   );
 };
 
-const CardItem: React.FC<{ card: LinkCard; onClick: () => void; style?: React.CSSProperties; className?: string }> = ({ card, onClick, style, className = '' }) => (
-  <div
+const CardItem: React.FC<{
+  card: LinkCard;
+  onClick: () => void;
+  style?: React.CSSProperties;
+  className?: string;
+}> = ({ card, onClick, style, className = '' }) => (
+  <button
+    type="button"
     onClick={onClick}
     style={style}
-    className={`group bg-white dark:bg-[#252220] p-5 rounded-xl border border-stone-100 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-none transition-all duration-300 cursor-pointer flex flex-col gap-4 h-full ${className}`}
+    className={`group relative bg-surface border border-subtle rounded-card p-5 text-left flex flex-col gap-4 h-full
+      shadow-card hover:shadow-card-hover hover:-translate-y-0.5 hover:border-default
+      transition-all duration-300 ease-spring cursor-pointer overflow-hidden ${className}`}
   >
+    {/* 顶部:icon 与右上箭头 */}
     <div className="flex items-start justify-between">
-      <div className="w-12 h-12 rounded-xl bg-stone-50 dark:bg-stone-900/50 border border-stone-100 dark:border-stone-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
-        <img
-          src={resolveIconSrc(card.icon)}
-          className="w-7 h-7 object-contain opacity-90 group-hover:opacity-100"
-          loading="lazy"
-          decoding="async"
-          onError={(e) => handleIconError(e, card.url)}
+      <div className="w-12 h-12 rounded-control bg-subtle border border-subtle flex items-center justify-center shrink-0
+        group-hover:scale-105 group-hover:bg-accent-soft group-hover:border-accent/30
+        transition-all duration-300 ease-spring">
+        <CachedIcon
+          icon={card.icon}
+          siteUrl={card.url}
           alt={card.title}
+          className="w-7 h-7 object-contain"
         />
       </div>
-      <ArrowUpRight size={18} className="text-stone-300 group-hover:text-stone-800 dark:group-hover:text-stone-200 transition-colors" />
+      <span className="w-8 h-8 rounded-full flex items-center justify-center text-3
+        group-hover:text-accent group-hover:bg-accent-soft transition-colors duration-300">
+        <ArrowUpRight size={16} strokeWidth={2.4} />
+      </span>
     </div>
 
-    <div>
-      <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 mb-1 line-clamp-1 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors">
+    {/* 标题与描述 */}
+    <div className="flex-1">
+      <h3 className="text-[15px] font-semibold text-1 mb-1 line-clamp-1 tracking-tight-display group-hover:text-accent transition-colors">
         {card.title}
       </h3>
-      <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed line-clamp-1">{card.description || 'No description available.'}</p>
+      <p className="text-[13px] text-2 leading-relaxed line-clamp-2">
+        {card.description || '暂无描述'}
+      </p>
     </div>
-  </div>
+  </button>
 );

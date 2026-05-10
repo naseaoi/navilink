@@ -122,7 +122,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
           onChange={setFilterCat} 
           className="w-auto min-w-[120px] max-w-[50%]" 
         />
-        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-full w-10 h-10 shrink-0"><Plus size={20}/></Button>
+        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-control w-10 h-10 shrink-0"><Plus size={20}/></Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-x-6 gap-y-6">
@@ -137,7 +137,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
               if (draggedId) return;
               setActiveMenuId(activeMenuId === card.id ? null : card.id);
             }}
-            className={`group relative bg-white pl-1.5 pr-8 py-4 rounded-2xl border border-stone-200 flex items-center gap-2.5 transition-all hover:border-stone-400 hover:shadow-md hover:shadow-stone-200/50 dark:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-600 ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''} ${activeMenuId === card.id ? 'border-stone-400 shadow-md ring-2 ring-stone-900/5' : ''}`}
+            className={`group relative bg-surface-raised pl-1.5 pr-24 py-4 rounded-card border border-subtle flex items-center gap-2.5 transition-all hover:border-default hover:shadow-card ${draggedId === card.id ? 'opacity-30 scale-95 border-dashed' : ''} ${activeMenuId === card.id ? 'border-default shadow-card ring-2 ring-accent/10' : ''}`}
           >
             <div 
               draggable 
@@ -147,12 +147,12 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               onClick={(e) => e.stopPropagation()}
-              className="cursor-grab active:cursor-grabbing p-0.5 -ml-0.5 text-stone-300 hover:text-stone-500 touch-none shrink-0"
+              className="cursor-grab active:cursor-grabbing p-0.5 -ml-0.5 text-3 hover:text-2 touch-none shrink-0"
             >
               <GripVertical size={10} />
             </div>
 
-            <div className="w-10 h-10 shrink-0 bg-stone-50 rounded-lg flex items-center justify-center border border-stone-100 overflow-hidden dark:bg-stone-800 dark:border-stone-800 group-hover:scale-105 transition-transform duration-300">
+            <div className="w-10 h-10 shrink-0 bg-subtle rounded-control flex items-center justify-center border border-subtle overflow-hidden group-hover:scale-105 transition-transform duration-300">
               <img 
                 src={resolveIconSrc(card.icon)} 
                 className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
@@ -164,26 +164,25 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
             </div>
 
             <div className="flex-1 min-w-0 flex flex-col gap-1 overflow-hidden">
-              <h4 className="font-bold text-base text-stone-800 dark:text-stone-200 leading-tight truncate">{card.title}</h4>
-              {card.description && <p className="text-xs text-stone-400 truncate leading-tight">{card.description}</p>}
-              <p className="text-[10px] text-stone-300 font-mono truncate opacity-80">
+              <h4 className="font-semibold text-base text-1 leading-tight truncate">{card.title}</h4>
+              {card.description && <p className="text-xs text-2 truncate leading-tight">{card.description}</p>}
+              <p className="text-[10px] text-3 truncate opacity-80">
                 {(() => { try { return new URL(card.url).hostname } catch { return card.url } })()}
               </p>
             </div>
             
-            <div 
-              className={`absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 transition-all bg-white/95 dark:bg-stone-900/95 backdrop-blur-sm p-1 rounded-xl shadow-lg border border-stone-100 dark:border-stone-800 ${activeMenuId === card.id ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:scale-100 group-hover:visible'}`}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className={`absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5 transition-all ${activeMenuId === card.id ? 'opacity-100 translate-x-0 visible' : 'opacity-0 translate-x-1 invisible group-hover:opacity-100 group-hover:translate-x-0 group-hover:visible'}`} onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={(e)=>{ e.stopPropagation(); openEdit(card); }} 
-                className="p-2 hover:bg-stone-100 rounded-lg text-stone-500 hover:text-stone-800 dark:hover:bg-stone-800"
+                className="flex h-8 w-8 items-center justify-center rounded-control border border-subtle bg-surface-raised text-2 shadow-soft hover:border-default hover:bg-subtle hover:text-1"
+                aria-label={`编辑 ${card.title}`}
               >
                 <Edit2 size={14}/>
               </button>
               <button 
                 onClick={(e)=>{ e.stopPropagation(); handleDelete(card.id); }} 
-                className="p-2 hover:bg-red-50 rounded-lg text-stone-500 hover:text-red-500 dark:hover:bg-red-950/30"
+                className="flex h-8 w-8 items-center justify-center rounded-control border border-subtle bg-surface-raised text-2 shadow-soft hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:hover:border-red-900/40 dark:hover:bg-red-950/30"
+                aria-label={`删除 ${card.title}`}
               >
                 <Trash2 size={14}/>
               </button>
@@ -201,8 +200,8 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
             <Select label="所属分类" value={editingCard.categoryId||''} onChange={v=>setEditingCard({...editingCard, categoryId:v})} options={data.categories.map((c:any)=>({value:c.id, label:c.name}))} />
           </div>
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-stone-600 dark:text-stone-400">描述</label>
-            <textarea className="w-full rounded-lg border border-stone-200 p-3 text-sm focus:border-stone-500 focus:outline-none dark:bg-stone-950 dark:border-stone-800 dark:text-stone-100" placeholder="简单描述一下..." rows={2} value={editingCard.description||''} onChange={e=>setEditingCard({...editingCard, description:e.target.value})} />
+            <label className="block text-sm font-medium text-2">描述</label>
+            <textarea className="w-full rounded-control border border-subtle bg-surface p-3 text-sm text-1 placeholder:text-3 hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none" placeholder="简单描述一下..." rows={2} value={editingCard.description||''} onChange={e=>setEditingCard({...editingCard, description:e.target.value})} />
           </div>
           <div className="pt-4 flex gap-3"><Button variant="secondary" className="flex-1" onClick={()=>setIsModalOpen(false)}>取消</Button><Button className="flex-1" onClick={save}>保存</Button></div>
         </div>

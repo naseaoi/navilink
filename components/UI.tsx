@@ -10,21 +10,22 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md', isLoading, className = '', children, ...props }) => {
-  const base = "inline-flex items-center justify-center font-medium transition-all focus:outline-none focus:ring-2 focus:ring-stone-400/20 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
-  
+  // 现代精致:统一弹性曲线 + 柔和阴影 + 微缩放反馈
+  const base = "inline-flex items-center justify-center font-medium transition-all duration-200 ease-spring focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-50 disabled:pointer-events-none active:scale-[0.97]";
+
   const variants = {
-    primary: "bg-stone-900 text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200",
-    secondary: "bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800",
-    danger: "bg-red-600 text-white hover:bg-red-700",
-    info: "bg-blue-600 text-white hover:bg-blue-700",
-    ghost: "bg-transparent text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+    primary: "bg-stone-900 text-white hover:bg-stone-800 shadow-soft dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200",
+    secondary: "bg-surface text-1 border border-subtle hover:border-default hover:bg-subtle dark:bg-stone-900 dark:hover:bg-stone-800",
+    danger: "bg-red-600 text-white hover:bg-red-700 shadow-soft",
+    info: "bg-accent text-white hover:bg-accent-hover shadow-soft",
+    ghost: "bg-transparent text-2 hover:bg-subtle hover:text-1"
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-sm rounded-lg",
-    md: "px-5 py-2.5 text-sm rounded-lg",
-    lg: "px-8 py-3 text-base rounded-xl",
-    icon: "p-2 rounded-lg w-10 h-10"
+    sm: "px-3 py-1.5 text-sm rounded-control",
+    md: "px-4 py-2.5 text-[13.5px] rounded-control",
+    lg: "px-6 py-3 text-[14.5px] rounded-control",
+    icon: "p-2 rounded-control w-10 h-10"
   };
 
   return (
@@ -37,9 +38,11 @@ export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md'
 // --- Input ---
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string }> = ({ label, className = '', ...props }) => (
   <div className="w-full">
-    {label && <label className="mb-2 block text-sm font-medium text-stone-600 dark:text-stone-400">{label}</label>}
+    {label && <label className="mb-1.5 block text-[12.5px] font-medium text-2">{label}</label>}
     <input
-      className={`flex h-11 w-full rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm transition-all placeholder:text-stone-400 focus:border-stone-500 focus:ring-0 focus:outline-none dark:bg-stone-950 dark:border-stone-800 dark:text-stone-100 ${className}`}
+      className={`flex h-11 w-full rounded-control border border-subtle bg-surface px-3.5 text-[13.5px] text-1
+        transition-all duration-200 placeholder:text-3
+        hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none ${className}`}
       {...props}
     />
   </div>
@@ -74,25 +77,28 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      {label && <label className="mb-2 block text-sm font-medium text-stone-600 dark:text-stone-400">{label}</label>}
+      {label && <label className="mb-1.5 block text-[12.5px] font-medium text-2">{label}</label>}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-11 w-full items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm transition-all hover:border-stone-300 dark:bg-stone-950 dark:border-stone-800 dark:text-stone-100"
+        className="flex h-11 w-full items-center justify-between rounded-control border border-subtle bg-surface px-3.5 text-[13.5px] text-1
+          transition-all duration-200 hover:border-default focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/15"
       >
-        <span className="truncate font-medium">{selectedOption?.label || '请选择 Select...'}</span>
-        <ChevronDown size={16} className={`text-stone-400 transition-transform duration-200 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="truncate font-medium">{selectedOption?.label || '请选择'}</span>
+        <ChevronDown size={15} className={`text-3 transition-transform duration-200 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      
+
       {isOpen && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-60 overflow-y-auto rounded-lg border border-stone-200 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 dark:bg-stone-900 dark:border-stone-800 min-w-full w-max">
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-60 overflow-y-auto rounded-control
+          border border-subtle bg-surface-raised shadow-popover
+          animate-in fade-in slide-in-from-top-2 duration-200 min-w-full w-max p-1">
           {options.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => { onChange(opt.value); setIsOpen(false); }}
-              className={`flex w-full items-center px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
-                value === opt.value ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100' : 'text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-800'
+              className={`flex w-full items-center px-3 py-2 text-[13px] font-medium rounded-md transition-colors whitespace-nowrap ${
+                value === opt.value ? 'bg-accent-soft text-accent' : 'text-2 hover:bg-subtle hover:text-1'
               }`}
             >
               {opt.label}
@@ -108,21 +114,22 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return createPortal((
-    <div 
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-stone-900/35 backdrop-blur-md animate-in fade-in duration-300"
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
-      <div 
-        className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 dark:bg-stone-900 dark:border dark:border-stone-800"
+      <div
+        className="w-full max-w-md bg-surface-raised rounded-modal shadow-popover overflow-hidden
+          animate-in zoom-in-95 fade-in duration-200 border border-subtle"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100 dark:border-stone-800">
-          <h3 className="text-lg font-serif font-bold text-stone-900 dark:text-stone-100">{title}</h3>
-          <button onClick={onClose} className="p-2 text-stone-400 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-all dark:hover:bg-stone-800">
-            <X size={20} />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-subtle">
+          <h3 className="text-[15px] font-semibold tracking-tight-display text-1">{title}</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-pill flex items-center justify-center text-3 hover:text-1 hover:bg-subtle transition-colors">
+            <X size={16} />
           </button>
         </div>
-        <div className="px-6 py-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto no-scrollbar">
           {children}
         </div>
       </div>
@@ -132,7 +139,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
 
 // --- Card ---
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-xl border border-stone-200 shadow-sm dark:bg-stone-900 dark:border-stone-800 ${className}`}>
+  <div className={`bg-surface-raised rounded-card border border-subtle shadow-card ${className}`}>
     {children}
   </div>
 );
@@ -140,19 +147,20 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string }> =
 export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; message: string; variant?: 'danger' | 'primary'; }> = ({ isOpen, onClose, onConfirm, title, message, variant = 'primary' }) => {
   if (!isOpen) return null;
   return createPortal((
-    <div 
-      className="fixed inset-0 z-[310] flex items-center justify-center p-4 bg-stone-900/35 backdrop-blur-md animate-in fade-in duration-200"
+    <div
+      className="fixed inset-0 z-[310] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
-      <div 
-        className="w-full max-w-sm bg-white rounded-xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 dark:bg-stone-900 dark:border dark:border-stone-800 text-center"
+      <div
+        className="w-full max-w-sm bg-surface-raised rounded-modal shadow-popover p-7
+          animate-in zoom-in-95 fade-in duration-200 border border-subtle text-center"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-lg font-serif font-bold text-stone-900 dark:text-stone-100 mb-2">{title}</h3>
-        <p className="text-stone-500 dark:text-stone-400 text-sm mb-8">{message}</p>
-        <div className="flex gap-4">
-          <Button variant="secondary" className="flex-1" onClick={onClose}>取消 Cancel</Button>
-          <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); onClose(); }}>确认 Confirm</Button>
+        <h3 className="text-[15.5px] font-semibold tracking-tight-display text-1 mb-2">{title}</h3>
+        <p className="text-2 text-[13px] mb-6 leading-relaxed">{message}</p>
+        <div className="flex gap-3">
+          <Button variant="secondary" className="flex-1" onClick={onClose}>取消</Button>
+          <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); onClose(); }}>确认</Button>
         </div>
       </div>
     </div>
@@ -162,7 +170,7 @@ export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onCo
 export type ToastType = 'success' | 'error' | 'info';
 export interface ToastMessage { id: number; type: ToastType; message: string; }
 export const ToastContainer: React.FC<{ messages: ToastMessage[]; onRemove: (id: number) => void }> = ({ messages, onRemove }) => (
-  <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-3 items-center pointer-events-none">
+  <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2.5 items-center pointer-events-none">
     {messages.map((toast) => (
       <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
     ))}
@@ -174,8 +182,10 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: (id: number) => void 
     return () => clearTimeout(timer);
   }, []);
   return (
-    <div className="pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-lg bg-stone-900 text-white shadow-xl animate-in slide-in-from-top-4 duration-300">
-      <span className="text-sm font-medium">{toast.message}</span>
+    <div className="pointer-events-auto flex items-center gap-3 px-5 py-2.5 rounded-pill
+      bg-stone-900 text-white shadow-popover animate-in slide-in-from-top-4 fade-in duration-300
+      dark:bg-stone-100 dark:text-stone-900">
+      <span className="text-[13px] font-medium">{toast.message}</span>
     </div>
   );
 };
@@ -184,15 +194,17 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
   const [show, setShow] = useState(false);
   return (
     <div className="w-full">
-      {label && <label className="mb-2 block text-sm font-medium text-stone-600 dark:text-stone-400">{label}</label>}
+      {label && <label className="mb-1.5 block text-[12.5px] font-medium text-2">{label}</label>}
       <div className="relative">
         <input
           type={show ? 'text' : 'password'}
-          className={`flex h-11 w-full rounded-lg border border-stone-200 bg-white pl-4 pr-10 py-2 text-sm transition-all focus:border-stone-500 focus:ring-0 focus:outline-none dark:bg-stone-950 dark:border-stone-800 dark:text-stone-100 ${className}`}
+          className={`flex h-11 w-full rounded-control border border-subtle bg-surface pl-3.5 pr-10 text-[13.5px] text-1
+            transition-all duration-200 placeholder:text-3
+            hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none ${className}`}
           {...props}
         />
-        <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-600 transition-colors">
-          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        <button type="button" onClick={() => setShow(!show)} className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-3 hover:text-1 hover:bg-subtle transition-colors">
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
     </div>
