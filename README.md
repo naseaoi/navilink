@@ -10,6 +10,7 @@
 - 内置管理后台：卡片 CRUD、拖拽排序、分类管理、站点设置
 - 双存储模式：本地 JSON 文件 或 WebDAV 云同步
 - 登录限流、scrypt 密码哈希、HMAC Token 鉴权
+- 安全图标代理：协议校验、内网地址拦截、超时和响应大小限制
 - 支持 Vercel / Docker / VPS 多种部署方式
 
 ## 技术栈
@@ -18,7 +19,7 @@
 |:---|:---|:---|
 | React 18 + TypeScript | Express 4 (Node.js) | Vite 5 |
 | Tailwind CSS 3 | JSON 文件存储 / WebDAV | Docker 多阶段构建 |
-| react-router-dom v6 | scrypt + HMAC-SHA256 鉴权 | GitHub Actions GHCR 镜像发布 |
+| react-router-dom v6 | scrypt + HMAC-SHA256 鉴权 | TypeScript 类型检查 + GitHub Actions |
 
 ## 快速开始
 
@@ -48,13 +49,21 @@ npm run build
 npm start
 ```
 
+`npm run build` 会先执行 `tsc --noEmit` 类型检查，再执行 Vite 生产构建。
+
+如只需检查类型：
+
+```bash
+npm run typecheck
+```
+
 ## 部署
 
 ### Vercel（推荐）
 
 1. Fork 本仓库到你的 GitHub
 2. 登录 [Vercel](https://vercel.com/)，导入项目
-3. 配置环境变量（`AUTH_SECRET` 必填，WebDAV 相关变量按需填写）
+3. 配置环境变量（`AUTH_SECRET`、`WEBDAV_URL`、`WEBDAV_USERNAME`、`WEBDAV_PASSWORD` 必填）
 4. 点击 Deploy
 
 > Vercel 环境下存储模式锁定为 WebDAV，本地存储和数据同步功能不可用。
@@ -118,7 +127,15 @@ pm2 start server.js --name navilink
 | `LOGIN_WINDOW_MS` | 否 | `60000` | 登录限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 窗口内最大登录失败次数 |
 
-未设置 `WEBDAV_URL` 时自动使用本地文件存储模式。Vercel 环境下 `AUTH_SECRET` 为必填，生产环境建议配置 `AUTH_SECRET` 与 `CORS_ORIGINS`。
+未设置 `WEBDAV_URL` 时，Express / Docker / VPS 模式自动使用本地文件存储。Vercel 环境下 `AUTH_SECRET` 和 WebDAV 相关变量为必填。生产环境建议配置 `AUTH_SECRET` 与 `CORS_ORIGINS`。
+
+## 安全说明
+
+- WebDAV 凭据只在服务端读取，不会注入前端构建产物。
+- `/api/webdav` 只允许访问 `public.json` 和 `private.json`。
+- `private.json` 不会降级写入浏览器 `localStorage`。
+- `/api/icon-proxy` 会校验协议、拦截内网地址、限制重定向次数、设置超时并限制响应体大小。
+- 登录限流在 Express 服务和 Vercel Serverless 入口都已启用。
 
 ## 使用说明
 
@@ -142,20 +159,32 @@ pm2 start server.js --name navilink
 navilink/
 ├── server.js              # Express 生产服务器
 ├── index.html             # SPA 入口
-├── App.tsx                # 主应用组件（路由、主题）
+├── App.tsx                # 主应用组件（路由、数据编排）
 ├── types.ts               # TypeScript 类型定义
 ├── components/
 │   ├── UI.tsx             # 通用 UI 组件库
+│   ├── AppLoading.tsx     # 全局加载状态
 │   ├── PublicView.tsx     # 导航首页
 │   ├── AdminDashboard.tsx # 管理后台
 │   ├── public/            # 首页子组件
 │   └── admin/             # 后台子组件
+├── hooks/
+│   ├── usePageMeta.ts     # 页面标题和 favicon 同步
+│   └── useTheme.ts        # 主题状态管理
 ├── services/
+│   ├── authSession.ts     # 前端登录态存取
+│   ├── iconCache.ts       # 图标缓存
 │   └── webdavService.ts   # 前端 API 调用封装
 ├── api/                   # Vercel Serverless Functions
+│   └── _shared/           # 后端共享鉴权、限流、数据和 WebDAV 工具
 ├── data/                  # 运行时数据（gitignore）
 └── .github/workflows/     # CI/CD
 ```
+
+## CI/CD
+
+- `.github/workflows/ci.yml`：安装依赖并执行 `npm run build`。
+- `.github/workflows/docker-image.yml`：构建并发布 GHCR Docker 镜像。
 
 ## License
 
