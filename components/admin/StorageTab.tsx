@@ -18,6 +18,8 @@ interface StorageTabProps {
   syncing: 'none' | 'localToWebdav' | 'webdavToLocal';
 }
 
+type StorageMode = 'local' | 'webdav';
+
 const formatTime = (value?: number | null) => {
   if (!value) return '未知';
   const date = new Date(value);
@@ -34,10 +36,12 @@ export const StorageTab: React.FC<StorageTabProps> = ({
   isLoading,
   syncing
 }) => {
-  const options = [
-    { value: 'local', label: '本地存储' },
-    ...(storageAvailable.webdav ? [{ value: 'webdav', label: 'WebDAV' }] : [])
-  ];
+  const options: { value: StorageMode; label: string }[] = [{ value: 'local', label: '本地存储' }];
+  if (storageAvailable.webdav) options.push({ value: 'webdav', label: 'WebDAV' });
+
+  const handleModeChange = (mode: string) => {
+    if (mode === 'local' || mode === 'webdav') onChangeMode(mode);
+  };
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -47,7 +51,7 @@ export const StorageTab: React.FC<StorageTabProps> = ({
           label="当前存储模式"
           options={options}
           value={storageMode}
-          onChange={(v) => onChangeMode(v)}
+          onChange={handleModeChange}
           className="w-full"
         />
         <p className="text-xs text-3">访客读取会跟随当前模式。</p>

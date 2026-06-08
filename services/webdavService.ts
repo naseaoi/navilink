@@ -40,20 +40,6 @@ const DEFAULT_PRIVATE_DATA: PrivateData = {
 };
 
 class WebDavService {
-  private isMock: boolean;
-
-  constructor() {
-    // Check if we are in a production-like environment where the API is available.
-    // In local development without 'vercel dev', we might still want mock or direct connection.
-    // For this implementation, we assume if we can't hit the API, we fallback to Mock or handle error.
-    // Note: client-side process.env.WEBDAV_URL is used here just to detect if envs were provided at build time,
-    // but the actual credentials are now handled by the serverless function /api/webdav.
-    
-    // logic: If NO env vars are injected at build time (and not mock), we assume Vercel Serverless environment.
-    // However, to keep it simple: If we are on the deployed site, we use the Proxy.
-    this.isMock = false; 
-  }
-
   private getAuthToken(): string | null {
     return localStorage.getItem('navilink_token');
   }
@@ -158,46 +144,31 @@ class WebDavService {
   }
 
   async fetchPrivateData(): Promise<PrivateData> {
-    try {
-      const response = await fetch('/api/webdav?file=private.json', {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
+    const response = await fetch('/api/webdav?file=private.json', {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
 
-      if (response.status === 404) {
-        await this.savePrivateData(DEFAULT_PRIVATE_DATA);
-        return DEFAULT_PRIVATE_DATA;
-      }
-      
-      if (!response.ok) {
-         const stored = localStorage.getItem('navilink_private');
-         if (stored) return JSON.parse(stored);
-         return DEFAULT_PRIVATE_DATA;
-      }
-
-      return await response.json();
-    } catch (e) {
-      const stored = localStorage.getItem('navilink_private');
-      if (stored) return JSON.parse(stored);
+    if (response.status === 404) {
+      await this.savePrivateData(DEFAULT_PRIVATE_DATA);
       return DEFAULT_PRIVATE_DATA;
     }
+    
+    if (!response.ok) throw new Error('Failed to load private data');
+
+    return await response.json();
   }
 
   async savePrivateData(data: PrivateData): Promise<void> {
-    try {
-      const response = await fetch('/api/webdav?file=private.json', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeaders()
-        },
-        body: JSON.stringify(data)
-      });
-      if (!response.ok) throw new Error('Failed to save via API');
-    } catch (e) {
-       localStorage.setItem('navilink_private', JSON.stringify(data));
-       throw e;
-    }
+    const response = await fetch('/api/webdav?file=private.json', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders()
+      },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to save private data');
   }
 }
 
