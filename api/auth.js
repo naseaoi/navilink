@@ -31,6 +31,9 @@ const hashPassword = (password) => {
 };
 
 const DEFAULT_ADMIN_PASSWORD = 'admin123';
+const LOGIN_WINDOW_MS = Number(process.env.LOGIN_WINDOW_MS || 60_000);
+const LOGIN_MAX_ATTEMPTS = Number(process.env.LOGIN_MAX_ATTEMPTS || 5);
+const loginAttempts = new Map();
 
 const verifyPassword = (password, stored) => {
   if (!stored) return false;
@@ -52,6 +55,47 @@ const normalizePrivateData = (data) => {
 const withTimestamp = (data) => {
   if (!data) return data;
   return { ...data, _meta: { ...(data._meta || {}), updatedAt: Date.now() } };
+};
+
+const getClientIp = (request) => {
+  const forwarded = request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  if (Array.isArray(forwarded) && forwarded[0]) {
+    return forwarded[0].split(',')[0].trim();
+  }
+  return request.socket?.remoteAddress || 'unknown';
+};
+
+const getLoginRateKey = (request, username) => `${getClientIp(request)}:${(username || '').toLowerCase()}`;
+
+const getRateLimitState = (key) => {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry) return { limited: false, retryAfterSeconds: 0 };
+  if (now - entry.firstFailedAt > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return { limited: false, retryAfterSeconds: 0 };
+  }
+  if (entry.count < LOGIN_MAX_ATTEMPTS) return { limited: false, retryAfterSeconds: 0 };
+  const retryAfterMs = Math.max(0, LOGIN_WINDOW_MS - (now - entry.firstFailedAt));
+  return { limited: true, retryAfterSeconds: Math.ceil(retryAfterMs / 1000) };
+};
+
+const recordLoginFailure = (key) => {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.firstFailedAt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, firstFailedAt: now });
+    return;
+  }
+  entry.count += 1;
+  loginAttempts.set(key, entry);
+};
+
+const clearLoginFailures = (key) => {
+  loginAttempts.delete(key);
 };
 
 const fetchWebDavJson = async (fileName, env) => {
@@ -105,6 +149,12 @@ export default async function handler(request, response) {
 
   const { username, password, remember } = request.body || {};
   if (!username || !password) return response.status(400).json({ error: 'Missing credentials' });
+  const rateKey = getLoginRateKey(request, username);
+  const rateState = getRateLimitState(rateKey);
+  if (rateState.limited) {
+    response.setHeader('Retry-After', String(rateState.retryAfterSeconds));
+    return response.status(429).json({ error: 'Too many login attempts, please try again later' });
+  }
 
   try {
     const env = { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH };
@@ -116,7 +166,12 @@ export default async function handler(request, response) {
 
     const stored = privateData?.admin?.passwordHash || '';
     const isValid = verifyPassword(password, stored) && privateData?.admin?.username === username;
-    if (!isValid) return response.status(401).json({ error: 'Invalid credentials' });
+    if (!isValid) {
+      recordLoginFailure(rateKey);
+      return response.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    clearLoginFailures(rateKey);
 
     if (stored && !stored.startsWith('scrypt$')) {
       const upgraded = normalizePrivateData(privateData);
