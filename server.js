@@ -8,6 +8,24 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { lookup } from 'dns/promises';
 import net from 'net';
+import {
+  DEFAULT_ADMIN_PASSWORD,
+  createDefaultPrivateData,
+  getAuthToken,
+  normalizePrivateData,
+  signToken,
+  verifyPassword,
+  verifyToken
+} from './api/_shared/auth.js';
+import { createLoginRateLimiter } from './api/_shared/rateLimit.js';
+import { getRequestedDataFile, getUpdatedAt, withTimestamp } from './api/_shared/data.js';
+import {
+  buildWebDavUrls,
+  fetchWebDavJson,
+  getWebDavAuthHeader,
+  hasWebDavConfig,
+  putWebDavJson
+} from './api/_shared/webdav.js';
 
 // 配置环境
 const __filename = fileURLToPath(import.meta.url);
@@ -25,14 +43,12 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || '')
   .filter(Boolean);
 const LOGIN_WINDOW_MS = Number(process.env.LOGIN_WINDOW_MS || 60_000);
 const LOGIN_MAX_ATTEMPTS = Number(process.env.LOGIN_MAX_ATTEMPTS || 5);
-const ALLOWED_DATA_FILES = new Set(['public.json', 'private.json']);
 const ICON_PROXY_MAX_BYTES = 5 * 1024 * 1024;
 const ICON_PROXY_TIMEOUT_MS = 10_000;
 const ICON_PROXY_MAX_REDIRECTS = 3;
 
 // WebDAV 配置 (如果存在则优先使用代理模式)
-const { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH } = process.env;
-const USE_WEBDAV = !!(WEBDAV_URL && WEBDAV_USERNAME && WEBDAV_PASSWORD);
+const USE_WEBDAV = hasWebDavConfig();
 
 const app = express();
 
@@ -109,73 +125,9 @@ const memoryCache = {
   'private.json': null
 };
 
-// --- Auth Helpers ---
-const base64UrlEncode = (input) => Buffer.from(input).toString('base64url');
-const base64UrlDecode = (input) => Buffer.from(input, 'base64url').toString();
-
-const signToken = (payload) => {
-  const body = base64UrlEncode(JSON.stringify(payload));
-  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
-  return `${body}.${sig}`;
-};
-
-const verifyToken = (token) => {
-  if (!token) return null;
-  const [body, sig] = token.split('.');
-  if (!body || !sig) return null;
-  const expected = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
-  const sigBuf = Buffer.from(sig);
-  const expBuf = Buffer.from(expected);
-  if (sigBuf.length !== expBuf.length) return null;
-  const valid = crypto.timingSafeEqual(sigBuf, expBuf);
-  if (!valid) return null;
-  const payload = JSON.parse(base64UrlDecode(body));
-  if (payload.exp && Date.now() > payload.exp) return null;
-  return payload;
-};
-
-const hashPassword = (password) => {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-  return `scrypt$${salt}$${hash}`;
-};
-
-const verifyPassword = (password, stored) => {
-  if (!stored) return false;
-  if (!stored.startsWith('scrypt$')) return password === stored;
-  const [, salt, hash] = stored.split('$');
-  if (!salt || !hash) return false;
-  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(derived));
-};
-
-const normalizePrivateData = (data) => {
-  if (!data?.admin?.passwordHash) return data;
-  if (!data.admin.passwordHash.startsWith('scrypt$')) {
-    return { ...data, admin: { ...data.admin, passwordHash: hashPassword(data.admin.passwordHash) } };
-  }
-  return data;
-};
-
-const withTimestamp = (fileName, data) => {
-  if (!data || (fileName !== 'public.json' && fileName !== 'private.json')) return data;
-  return { ...data, _meta: { ...(data._meta || {}), updatedAt: Date.now() } };
-};
-
-const getUpdatedAt = (data) => {
-  if (!data || !data._meta || !data._meta.updatedAt) return null;
-  return data._meta.updatedAt;
-};
-
-const getAuthToken = (req) => {
-  const header = req.headers.authorization || '';
-  if (header.startsWith('Bearer ')) return header.slice('Bearer '.length);
-  return null;
-};
-
 const requireAuth = (req, res) => {
   const token = getAuthToken(req);
-  const payload = verifyToken(token);
+  const payload = verifyToken(token, AUTH_SECRET);
   if (!payload) {
     res.status(401).json({ error: 'Unauthorized' });
     return null;
@@ -183,53 +135,8 @@ const requireAuth = (req, res) => {
   return payload;
 };
 
-const DEFAULT_PRIVATE_DATA = {
-  admin: {
-    username: 'admin',
-    passwordHash: hashPassword('admin123')
-  }
-};
-const DEFAULT_ADMIN_PASSWORD = 'admin123';
-
-const loginAttempts = new Map();
-
-const getClientIp = (req) => {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.ip || req.socket?.remoteAddress || 'unknown';
-};
-
-const getLoginRateKey = (req, username) => `${getClientIp(req)}:${(username || '').toLowerCase()}`;
-
-const getRateLimitState = (key) => {
-  const now = Date.now();
-  const entry = loginAttempts.get(key);
-  if (!entry) return { limited: false, retryAfterSeconds: 0 };
-  if (now - entry.firstFailedAt > LOGIN_WINDOW_MS) {
-    loginAttempts.delete(key);
-    return { limited: false, retryAfterSeconds: 0 };
-  }
-  if (entry.count < LOGIN_MAX_ATTEMPTS) return { limited: false, retryAfterSeconds: 0 };
-  const retryAfterMs = Math.max(0, LOGIN_WINDOW_MS - (now - entry.firstFailedAt));
-  return { limited: true, retryAfterSeconds: Math.ceil(retryAfterMs / 1000) };
-};
-
-const recordLoginFailure = (key) => {
-  const now = Date.now();
-  const entry = loginAttempts.get(key);
-  if (!entry || now - entry.firstFailedAt > LOGIN_WINDOW_MS) {
-    loginAttempts.set(key, { count: 1, firstFailedAt: now });
-    return;
-  }
-  entry.count += 1;
-  loginAttempts.set(key, entry);
-};
-
-const clearLoginFailures = (key) => {
-  loginAttempts.delete(key);
-};
+const DEFAULT_PRIVATE_DATA = createDefaultPrivateData();
+const loginRateLimiter = createLoginRateLimiter({ windowMs: LOGIN_WINDOW_MS, maxAttempts: LOGIN_MAX_ATTEMPTS });
 
 const readLocalJson = async (filePath) => {
   try {
@@ -265,36 +172,6 @@ const setStorageMode = async (mode) => {
   if (storageModeCache === 'webdav' && !USE_WEBDAV) storageModeCache = 'local';
   await writeLocalJsonAtomic(STORAGE_CONFIG_PATH, { mode: storageModeCache });
   return storageModeCache;
-};
-
-const fetchWebDavJson = async (fileName) => {
-  const baseUrl = WEBDAV_URL.replace(/\/+$/, '');
-  const davPath = (WEBDAV_PATH || 'navilink').replace(/^\/+|\/+$/g, '');
-  const targetUrl = `${baseUrl}/${davPath}/${fileName}`;
-  const authHeader = 'Basic ' + Buffer.from(`${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}`).toString('base64');
-  const response = await fetch(targetUrl, { method: 'GET', headers: { Authorization: authHeader } });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`WebDAV read failed: ${response.status}`);
-  return response.json();
-};
-
-const putWebDavJson = async (fileName, data) => {
-  const baseUrl = WEBDAV_URL.replace(/\/+$/, '');
-  const davPath = (WEBDAV_PATH || 'navilink').replace(/^\/+|\/+$/g, '');
-  const targetUrl = `${baseUrl}/${davPath}/${fileName}`;
-  const dirUrl = `${baseUrl}/${davPath}/`;
-  const authHeader = 'Basic ' + Buffer.from(`${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}`).toString('base64');
-  const fetchOptions = {
-    method: 'PUT',
-    headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  };
-  let response = await fetch(targetUrl, fetchOptions);
-  if (response.status === 409) {
-    await fetch(dirUrl, { method: 'MKCOL', headers: { Authorization: authHeader } });
-    response = await fetch(targetUrl, fetchOptions);
-  }
-  if (!response.ok) throw new Error(`WebDAV write failed: ${response.status}`);
 };
 
 const readDataFromStorage = async (mode, fileName) => {
@@ -397,11 +274,10 @@ const readLimitedResponse = async (response) => {
 
 // 统一的 API 入口
 app.all('/api/webdav', async (req, res) => {
-  const requestedFile = typeof req.query.file === 'string' ? req.query.file.trim() : 'public.json';
-  if (!ALLOWED_DATA_FILES.has(requestedFile)) {
+  const fileName = getRequestedDataFile(req.query.file);
+  if (!fileName) {
     return res.status(400).json({ error: 'Invalid file parameter' });
   }
-  const fileName = requestedFile;
 
   const isPrivate = fileName === 'private.json';
   const isWrite = req.method === 'PUT';
@@ -473,8 +349,8 @@ async function handleLocalStorage(req, res, fileName) {
 app.post('/api/auth/login', async (req, res) => {
   const { username, password, remember } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
-  const rateKey = getLoginRateKey(req, username);
-  const rateState = getRateLimitState(rateKey);
+  const rateKey = loginRateLimiter.getKey(req, username);
+  const rateState = loginRateLimiter.getState(rateKey);
   if (rateState.limited) {
     res.set('Retry-After', String(rateState.retryAfterSeconds));
     return res.status(429).json({ error: 'Too many login attempts, please try again later' });
@@ -501,11 +377,11 @@ app.post('/api/auth/login', async (req, res) => {
     const stored = privateData?.admin?.passwordHash || '';
     const isValid = verifyPassword(password, stored);
     if (!isValid || privateData?.admin?.username !== username) {
-      recordLoginFailure(rateKey);
+      loginRateLimiter.recordFailure(rateKey);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    clearLoginFailures(rateKey);
+    loginRateLimiter.clear(rateKey);
     const mustChangePassword = verifyPassword(DEFAULT_ADMIN_PASSWORD, stored);
 
     if (stored && !stored.startsWith('scrypt$')) {
@@ -517,7 +393,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const duration = remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     const exp = Date.now() + duration;
-    const token = signToken({ username, exp, mustChangePassword });
+    const token = signToken({ username, exp, mustChangePassword }, AUTH_SECRET);
     return res.json({ token, exp, mustChangePassword });
   } catch (error) {
     console.error(`[Auth Error] ${error.message}`);
@@ -527,7 +403,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/verify', (req, res) => {
   const token = getAuthToken(req);
-  const payload = verifyToken(token);
+  const payload = verifyToken(token, AUTH_SECRET);
   if (!payload) return res.status(401).json({ ok: false });
   return res.json({ ok: true, exp: payload.exp, mustChangePassword: !!payload.mustChangePassword });
 });
@@ -607,11 +483,8 @@ app.post('/api/storage/sync', async (req, res) => {
 
 // 处理 WebDAV 代理 (与 Vercel 逻辑保持一致)
 async function handleWebDAVProxy(req, res, fileName) {
-  const baseUrl = WEBDAV_URL.replace(/\/+$/, '');
-  const davPath = (WEBDAV_PATH || 'navilink').replace(/^\/+|\/+$/g, '');
-  const targetUrl = `${baseUrl}/${davPath}/${fileName}`;
-  
-  const authHeader = 'Basic ' + Buffer.from(`${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}`).toString('base64');
+  const { targetUrl, dirUrl } = buildWebDavUrls(fileName);
+  const authHeader = getWebDavAuthHeader();
 
   try {
     const fetchOptions = {
@@ -634,7 +507,6 @@ async function handleWebDAVProxy(req, res, fileName) {
     // 处理 409 (文件夹不存在)
     if (response.status === 409 && req.method === 'PUT') {
        // 尝试创建目录
-       const dirUrl = `${baseUrl}/${davPath}/`;
        await fetch(dirUrl, { method: 'MKCOL', headers: { 'Authorization': authHeader } });
        // 重试保存
        const retryRes = await fetch(targetUrl, fetchOptions);

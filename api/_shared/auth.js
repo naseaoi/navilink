@@ -1,0 +1,65 @@
+import crypto from 'crypto';
+
+export const DEFAULT_ADMIN_PASSWORD = 'admin123';
+
+const base64UrlEncode = (input) => Buffer.from(input).toString('base64url');
+const base64UrlDecode = (input) => Buffer.from(input, 'base64url').toString();
+
+export const signToken = (payload, secret) => {
+  const body = base64UrlEncode(JSON.stringify(payload));
+  const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
+  return `${body}.${sig}`;
+};
+
+export const verifyToken = (token, secret) => {
+  if (!token || !secret) return null;
+  const [body, sig] = token.split('.');
+  if (!body || !sig) return null;
+  const expected = crypto.createHmac('sha256', secret).update(body).digest('base64url');
+  const sigBuf = Buffer.from(sig);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length) return null;
+  const valid = crypto.timingSafeEqual(sigBuf, expBuf);
+  if (!valid) return null;
+  const payload = JSON.parse(base64UrlDecode(body));
+  if (payload.exp && Date.now() > payload.exp) return null;
+  return payload;
+};
+
+export const hashPassword = (password) => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+};
+
+export const verifyPassword = (password, stored) => {
+  if (!stored) return false;
+  if (!stored.startsWith('scrypt$')) return password === stored;
+  const [, salt, hash] = stored.split('$');
+  if (!salt || !hash) return false;
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(derived));
+};
+
+export const normalizePrivateData = (data) => {
+  if (!data?.admin?.passwordHash) return data;
+  if (!data.admin.passwordHash.startsWith('scrypt$')) {
+    return { ...data, admin: { ...data.admin, passwordHash: hashPassword(data.admin.passwordHash) } };
+  }
+  return data;
+};
+
+export const createDefaultPrivateData = () => ({
+  admin: {
+    username: 'admin',
+    passwordHash: hashPassword(DEFAULT_ADMIN_PASSWORD)
+  }
+});
+
+export const getAuthToken = (request) => {
+  const header = request.headers.authorization || '';
+  if (header.startsWith('Bearer ')) return header.slice('Bearer '.length);
+  return null;
+};
+
+export const getAuthPayload = (request, secret) => verifyToken(getAuthToken(request), secret);

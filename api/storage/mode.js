@@ -1,30 +1,14 @@
-import crypto from 'crypto';
-
-const verifyToken = (token, secret) => {
-  if (!token || !secret) return null;
-  const [body, sig] = token.split('.');
-  if (!body || !sig) return null;
-  const expected = crypto.createHmac('sha256', secret).update(body).digest('base64url');
-  const sigBuf = Buffer.from(sig);
-  const expBuf = Buffer.from(expected);
-  if (sigBuf.length !== expBuf.length) return null;
-  const valid = crypto.timingSafeEqual(sigBuf, expBuf);
-  if (!valid) return null;
-  const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
-  if (payload.exp && Date.now() > payload.exp) return null;
-  return payload;
-};
+import { getAuthPayload } from '../_shared/auth.js';
+import { hasWebDavConfig } from '../_shared/webdav.js';
 
 export default async function handler(request, response) {
-  const { AUTH_SECRET, WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD } = process.env;
+  const { AUTH_SECRET } = process.env;
   if (!AUTH_SECRET) return response.status(500).json({ error: 'AUTH_SECRET is missing.' });
-  if (!WEBDAV_URL || !WEBDAV_USERNAME || !WEBDAV_PASSWORD) {
+  if (!hasWebDavConfig()) {
     return response.status(500).json({ error: 'WebDAV environment variables are missing on Vercel.' });
   }
 
-  const header = request.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : null;
-  const payload = verifyToken(token, AUTH_SECRET);
+  const payload = getAuthPayload(request, AUTH_SECRET);
   if (!payload) return response.status(401).json({ error: 'Unauthorized' });
 
   if (request.method === 'GET') {

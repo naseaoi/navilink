@@ -19,6 +19,7 @@ RUN mkdir -p ./data
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/api/_shared ./api/_shared
 
 EXPOSE 3000
 CMD ["node", "server.js"]
