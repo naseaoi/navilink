@@ -101,7 +101,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
 
         <MobileBar theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} onSearchOpen={() => setIsSearchOpen(true)} />
 
-        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-10 md:px-10 md:py-16">
+        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-8 md:px-12 md:py-20">
           <Outlet context={outletContext} />
         </main>
       </div>

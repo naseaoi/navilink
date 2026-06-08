@@ -13,6 +13,9 @@ interface SearchOverlayProps {
   onOpenResult: (card: LinkCard) => void;
 }
 
+const kbdClass =
+  'flex h-7 min-w-[28px] items-center justify-center rounded-lg border border-subtle bg-subtle px-1.5 text-[12px] font-medium text-3';
+
 export const SearchOverlay: React.FC<SearchOverlayProps> = ({
   isOpen,
   searchQuery,
@@ -26,23 +29,21 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-canvas/85 backdrop-blur-xl animate-in fade-in duration-200
-        flex flex-col items-center pt-[12vh] px-4"
+      className="fixed inset-0 z-[100] flex flex-col items-center px-4 pt-[12vh] bg-canvas/85 backdrop-blur-xl animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-surface-raised border border-subtle rounded-modal shadow-popover
-          overflow-hidden animate-in zoom-in-95 fade-in duration-200"
+        className="w-full max-w-2xl overflow-hidden rounded-3xl border border-subtle bg-surface shadow-popover animate-in zoom-in-95 fade-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 搜索输入区 */}
-        <div className="flex items-center gap-3 px-5 h-14 border-b border-subtle">
-          <Search size={18} strokeWidth={2.2} className="text-3 shrink-0" />
+        <div className="flex items-center gap-3 border-b border-subtle p-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+            <Search size={20} strokeWidth={2.2} />
+          </span>
           <input
             ref={searchInputRef}
-            className="flex-1 bg-transparent text-[15px] font-medium text-1 placeholder:text-3
-              focus:outline-none"
-            placeholder="搜索导航卡片..."
+            className="flex-1 bg-transparent text-[15px] font-medium text-1 placeholder:text-3 focus:outline-none"
+            placeholder="搜索网站或工具..."
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             onKeyDown={(e) => {
@@ -51,59 +52,43 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
               }
             }}
           />
-          <kbd className="px-1.5 py-0.5 rounded-md text-[11px] font-mono font-medium
-            bg-subtle border border-subtle text-3 hidden sm:inline-block">ESC</kbd>
+          <kbd className={`hidden sm:flex ${kbdClass}`}>ESC</kbd>
           <button
             onClick={onClose}
-            className="sm:hidden w-8 h-8 rounded-pill flex items-center justify-center text-3 hover:bg-subtle"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-3 transition-colors hover:bg-subtle hover:text-1 sm:hidden"
             aria-label="关闭"
           >
-            <X size={16} />
+            <X size={18} strokeWidth={2.2} />
           </button>
         </div>
 
-        {/* 结果列表 - 隐藏滚动条 */}
-        <div className="max-h-[55vh] overflow-y-auto no-scrollbar">
+        <div className="no-scrollbar max-h-[55vh] overflow-y-auto p-2">
           {!searchQuery.trim() && (
-            <div className="px-5 py-10 text-center text-3 text-[13px]">
-              输入关键字开始搜索
-            </div>
+            <div className="px-5 py-12 text-center text-[13px] text-3">输入关键字开始搜索</div>
           )}
 
           {searchQuery.trim() && searchResults.length === 0 && (
-            <div className="px-5 py-10 text-center text-3 text-[13px]">
-              没有匹配的结果
-            </div>
+            <div className="px-5 py-12 text-center text-[13px] text-3">没有匹配的结果</div>
           )}
 
           {searchResults.length > 0 && (
-            <ul className="p-2">
+            <ul className="flex flex-col gap-1">
               {searchResults.map((card, index) => (
                 <li key={`search-${card.id}`}>
                   <button
                     type="button"
                     onClick={() => onOpenResult(card)}
-                    className="group w-full px-3 py-2.5 rounded-control flex items-center gap-3
-                      hover:bg-subtle text-left transition-colors"
+                    className="group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-subtle"
                   >
-                    <div className="w-9 h-9 rounded-control bg-subtle border border-subtle flex items-center justify-center shrink-0
-                      group-hover:bg-accent-soft group-hover:border-accent/30 transition-colors">
-                      <CachedIcon
-                        icon={card.icon}
-                        siteUrl={card.url}
-                        alt={card.title}
-                        className="w-6 h-6 object-contain"
-                      />
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-subtle bg-subtle transition-colors group-hover:border-accent/30 group-hover:bg-accent-soft">
+                      <CachedIcon icon={card.icon} siteUrl={card.url} alt={card.title} className="h-6 w-6 object-contain" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13.5px] font-semibold text-1 truncate">{card.title}</div>
-                      <div className="text-[12px] text-3 truncate">{card.description || card.url}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] font-semibold text-1">{card.title}</div>
+                      <div className="truncate text-[12.5px] text-3">{card.description || card.url}</div>
                     </div>
-                    {index === 0 && (
-                      <kbd className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium
-                        bg-canvas border border-subtle text-3">↵</kbd>
-                    )}
-                    <ArrowUpRight size={14} className="text-3 group-hover:text-accent transition-colors shrink-0" />
+                    {index === 0 && <kbd className={`hidden sm:flex ${kbdClass}`}>↵</kbd>}
+                    <ArrowUpRight size={16} strokeWidth={2.2} className="shrink-0 text-3 transition-colors group-hover:text-accent" />
                   </button>
                 </li>
               ))}
@@ -111,15 +96,14 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
           )}
         </div>
 
-        {/* 底部提示 */}
-        <div className="hidden sm:flex items-center justify-between px-5 h-10 border-t border-subtle bg-subtle/40 text-[11px] text-3">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 rounded-md font-mono bg-surface border border-subtle">↵</kbd>
+        <div className="hidden items-center justify-between border-t border-subtle bg-subtle/40 px-4 py-2.5 text-[11.5px] text-3 sm:flex">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5">
+              <kbd className={kbdClass}>↵</kbd>
               <span>打开</span>
             </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 rounded-md font-mono bg-surface border border-subtle">ESC</kbd>
+            <span className="flex items-center gap-1.5">
+              <kbd className={kbdClass}>ESC</kbd>
               <span>关闭</span>
             </span>
           </div>
