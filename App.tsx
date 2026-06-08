@@ -2,6 +2,8 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppLoading } from './components/AppLoading';
 import { PublicView } from './components/PublicView';
+import { HomePage } from './components/public/HomePage';
+import { CategoryPage } from './components/public/CategoryPage';
 import { AdminLogin } from './components/admin/AdminLogin';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useTheme } from './hooks/useTheme';
@@ -73,7 +75,10 @@ const MainApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<PublicView data={state.publicData} theme={theme} onToggleTheme={toggleTheme} />} />
+      <Route element={<PublicView data={state.publicData} theme={theme} onToggleTheme={toggleTheme} />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/c/:categoryId" element={<CategoryPage />} />
+      </Route>
       <Route path="/tat" element={
         isAuthenticated ? (
           privateData ? (

@@ -1,11 +1,9 @@
 import React, { useDeferredValue, useState, useMemo, useEffect, useRef } from 'react';
+import { Outlet, useNavigate, useOutletContext } from 'react-router-dom';
 import { PublicData, LinkCard } from '../types';
 import { ArrowUpRight } from 'lucide-react';
 import { Modal, Button } from './UI';
-import { useNavigate } from 'react-router-dom';
-import { PublicHeader } from './public/PublicHeader';
-import { CategoryTabs } from './public/CategoryTabs';
-import { CardGrid } from './public/CardGrid';
+import { Sidebar, MobileBar } from './public/Sidebar';
 import { SearchOverlay } from './public/SearchOverlay';
 import { CachedIcon } from './public/CachedIcon';
 
@@ -15,24 +13,29 @@ interface PublicViewProps {
   onToggleTheme?: () => void;
 }
 
+export interface PublicOutletContext {
+  data: PublicData;
+  onCardClick: (card: LinkCard) => void;
+  onSearchOpen: () => void;
+}
+
+export const usePublicOutlet = () => useOutletContext<PublicOutletContext>();
+
 export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', onToggleTheme }) => {
   const navigate = useNavigate();
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmCard, setConfirmCard] = useState<LinkCard | null>(null);
-  const [gridRenderKey, setGridRenderKey] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
+
   const closeSearch = () => {
     setIsSearchOpen(false);
     setSearchQuery('');
-    setGridRenderKey((prev) => prev + 1);
   };
 
-  // 三连击后台入口
   const clickRef = useRef({ count: 0, lastTime: 0 });
-  const handleTitleClick = () => {
+  const handleLogoClick = () => {
     const now = Date.now();
     if (now - clickRef.current.lastTime < 500) {
       clickRef.current.count += 1;
@@ -40,28 +43,22 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
       clickRef.current.count = 1;
     }
     clickRef.current.lastTime = now;
-
     if (clickRef.current.count === 3) {
       clickRef.current.count = 0;
       navigate('/tat');
     }
   };
 
-  // 文档标题同步
   useEffect(() => {
-    if (data.settings.title) {
-      document.title = data.settings.title;
-    }
+    if (data.settings.title) document.title = data.settings.title;
   }, [data.settings.title]);
 
-  // 搜索面板打开时聚焦
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
       setTimeout(() => searchInputRef.current?.focus(), 100);
     }
   }, [isSearchOpen]);
 
-  // 全局快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -74,35 +71,41 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const filteredCards = useMemo(() => {
-    let cards = [...data.cards];
-    if (selectedCategory !== 'all') cards = cards.filter(c => c.categoryId === selectedCategory);
-    if (deferredSearchQuery.trim()) {
-      const q = deferredSearchQuery.toLowerCase();
-      cards = cards.filter(c => (c.title || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
-    }
-    return cards.sort((a, b) => a.order - b.order);
-  }, [data.cards, selectedCategory, deferredSearchQuery]);
-
-  const searchResults = useMemo(() => filteredCards.slice(0, 8), [filteredCards]);
+  const searchResults = useMemo(() => {
+    const q = deferredSearchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return [...data.cards]
+      .filter((c) => (c.title || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q))
+      .sort((a, b) => a.order - b.order)
+      .slice(0, 8);
+  }, [data.cards, deferredSearchQuery]);
 
   const openSearchResult = (card: LinkCard) => {
     setConfirmCard(card);
     closeSearch();
   };
 
+  const outletContext: PublicOutletContext = {
+    data,
+    onCardClick: setConfirmCard,
+    onSearchOpen: () => setIsSearchOpen(true)
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-canvas text-1 transition-colors duration-300 font-sans">
-      <PublicHeader
-        title={data.settings.title}
-        icon={data.settings.icon}
-        theme={theme}
-        onSearchOpen={() => setIsSearchOpen(true)}
-        onToggleTheme={onToggleTheme}
-        onTitleClick={handleTitleClick}
-      />
-      <CategoryTabs categories={data.categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
-      <CardGrid cards={filteredCards} selectedCategory={selectedCategory} gridRenderKey={gridRenderKey} onCardClick={setConfirmCard} />
+    <div className="flex min-h-screen bg-canvas font-sans text-1 transition-colors duration-300">
+      <Sidebar categories={data.categories} theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} />
+
+      <div className="relative min-w-0 flex-1 overflow-hidden">
+        <div className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-accent/20 blur-[120px] dark:bg-accent/12" />
+        <div className="pointer-events-none absolute right-20 top-8 h-[320px] w-[320px] rounded-full bg-fuchsia-400/15 blur-[110px] dark:bg-fuchsia-500/8" />
+
+        <MobileBar theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} onSearchOpen={() => setIsSearchOpen(true)} />
+
+        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-10 md:px-10 md:py-16">
+          <Outlet context={outletContext} />
+        </main>
+      </div>
+
       <SearchOverlay
         isOpen={isSearchOpen}
         searchQuery={searchQuery}
@@ -113,38 +116,31 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
         onOpenResult={openSearchResult}
       />
 
-      {/* Footer */}
-      <footer className="mt-auto py-8 px-6 border-t border-subtle/50">
-        <div className="max-w-7xl mx-auto text-center text-3 text-[12.5px]">
-          {data.settings.footerText || `© 2025 ${data.settings.title}`}
-        </div>
-      </footer>
-
-      {/* 跳转确认弹窗 */}
       <Modal isOpen={!!confirmCard} onClose={() => setConfirmCard(null)} title="即将离开本站">
-        <div className="flex flex-col items-center text-center space-y-5 pt-1">
-          <div className="w-16 h-16 rounded-card bg-subtle border border-subtle flex items-center justify-center shrink-0 shadow-soft">
-            <CachedIcon
-              icon={confirmCard?.icon}
-              siteUrl={confirmCard?.url}
-              alt={confirmCard?.title}
-              className="w-10 h-10 object-contain"
-            />
+        <div className="flex flex-col items-center space-y-5 pt-1 text-center">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-card border border-subtle bg-subtle shadow-soft">
+            <CachedIcon icon={confirmCard?.icon} siteUrl={confirmCard?.url} alt={confirmCard?.title} className="h-10 w-10 object-contain" />
           </div>
 
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-[16px] text-1 tracking-tight-display">{confirmCard?.title}</h4>
-            <p className="text-[13px] text-2 mt-1.5 max-w-xs mx-auto leading-relaxed">
+          <div className="min-w-0 flex-1">
+            <h4 className="text-[16px] font-semibold tracking-tight-display text-1">{confirmCard?.title}</h4>
+            <p className="mx-auto mt-1.5 max-w-xs text-[13px] leading-relaxed text-2">
               {confirmCard?.description || '即将打开外部链接'}
             </p>
-            {confirmCard?.url && (
-              <p className="text-[11.5px] text-3 mt-2 truncate font-medium">{confirmCard.url}</p>
-            )}
+            {confirmCard?.url && <p className="mt-2 truncate text-[11.5px] font-medium text-3">{confirmCard.url}</p>}
           </div>
 
-          <div className="w-full flex gap-3 pt-2">
+          <div className="flex w-full gap-3 pt-2">
             <Button variant="secondary" className="flex-1" onClick={() => setConfirmCard(null)}>取消</Button>
-            <Button className="flex-1" onClick={() => { if (confirmCard) { window.open(confirmCard.url, '_blank', 'noopener,noreferrer'); setConfirmCard(null); } }}>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                if (confirmCard) {
+                  window.open(confirmCard.url, '_blank', 'noopener,noreferrer');
+                  setConfirmCard(null);
+                }
+              }}
+            >
               <span>前往</span>
               <ArrowUpRight className="ml-1.5" size={15} strokeWidth={2.4} />
             </Button>
