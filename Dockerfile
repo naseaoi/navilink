@@ -1,6 +1,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+ARG APP_VERSION=dev
+ARG GIT_SHA=unknown
+ENV VITE_APP_VERSION=$APP_VERSION
+ENV VITE_GIT_SHA=$GIT_SHA
+
 COPY package*.json ./
 RUN npm ci
 
