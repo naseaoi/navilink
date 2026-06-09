@@ -65,8 +65,8 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
               <>
                 <span className="flex-1 font-semibold text-1 truncate">{c.name}</span>
                 <div className="flex gap-1">
-                  <button onClick={() => handleEdit(c)} className="p-2 hover:bg-subtle rounded-md text-3 hover:text-1 transition-colors"><Edit2 size={16}/></button>
-                  <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-md text-3 hover:text-red-500 transition-colors dark:hover:bg-red-950/30"><Trash2 size={16}/></button>
+                  <button aria-label={`编辑 ${c.name}`} onClick={() => handleEdit(c)} className="p-2 hover:bg-subtle rounded-md text-3 hover:text-1 transition-colors"><Edit2 size={16}/></button>
+                  <button aria-label={`删除 ${c.name}`} onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-md text-3 hover:text-red-500 transition-colors dark:hover:bg-red-950/30"><Trash2 size={16}/></button>
                 </div>
               </>
             )}

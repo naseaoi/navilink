@@ -9,15 +9,16 @@
 - 全局搜索（`Cmd+K` / `Ctrl+K`）
 - 内置管理后台：卡片 CRUD、拖拽排序、分类管理、站点设置
 - 双存储模式：本地 JSON 文件 或 WebDAV 云同步
-- 登录限流、scrypt 密码哈希、HMAC Token 鉴权
-- 安全图标代理：协议校验、内网地址拦截、超时和响应大小限制
+- HttpOnly Cookie 登录态、登录限流、scrypt 密码哈希、HMAC Token 鉴权
+- 批量保存接口：统一保存公开数据和私有数据，支持版本冲突提示
+- 安全图标代理：协议校验、内网地址拦截、固定 DNS 解析、超时和响应大小限制
 - 支持 Vercel / Docker / VPS 多种部署方式
 
 ## 技术栈
 
 | 前端 | 后端 | 构建 |
 |:---|:---|:---|
-| React 18 + TypeScript | Express 4 (Node.js) | Vite 5 |
+| React 18 + TypeScript | Express 4 (Node.js) | Vite 6 |
 | Tailwind CSS 3 | JSON 文件存储 / WebDAV | Docker 多阶段构建 |
 | react-router-dom v6 | scrypt + HMAC-SHA256 鉴权 | TypeScript 类型检查 + GitHub Actions |
 
@@ -49,13 +50,25 @@ npm run build
 npm start
 ```
 
-`npm run build` 会先执行 `tsc --noEmit` 类型检查，再执行 Vite 生产构建。
+`npm run build` 会依次执行 ESLint、Node 单元测试、TypeScript 类型检查和 Vite 生产构建。
 
 如只需检查类型：
 
 ```bash
 npm run typecheck
 ```
+
+常用验证命令：
+
+```bash
+npm run lint
+npm run test
+npm run typecheck
+npm run build
+npm run test:e2e
+```
+
+`npm run test:e2e` 会先构建生产产物，再启动本地服务执行 Playwright 用例。
 
 ## 部署
 
@@ -126,6 +139,9 @@ pm2 start server.js --name navilink
 | `CORS_ORIGINS` | 否 | 空（允许所有） | 允许的跨域来源，逗号分隔 |
 | `LOGIN_WINDOW_MS` | 否 | `60000` | 登录限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 窗口内最大登录失败次数 |
+| `COOKIE_SAMESITE` | 否 | `Lax` | Cookie SameSite 策略，支持 `Lax` / `Strict` / `None` |
+| `COOKIE_DOMAIN` | 否 | - | Cookie Domain |
+| `COOKIE_SECURE` | 否 | 自动 | 是否强制 Secure Cookie，`COOKIE_SAMESITE=None` 时会自动启用 |
 
 未设置 `WEBDAV_URL` 时，Express / Docker / VPS 模式自动使用本地文件存储。Vercel 环境下 `AUTH_SECRET` 和 WebDAV 相关变量为必填。生产环境建议配置 `AUTH_SECRET` 与 `CORS_ORIGINS`。
 
@@ -133,8 +149,10 @@ pm2 start server.js --name navilink
 
 - WebDAV 凭据只在服务端读取，不会注入前端构建产物。
 - `/api/webdav` 只允许访问 `public.json` 和 `private.json`。
+- `/api/storage/save` 会同时保存 `public.json` 和 `private.json`，并基于更新时间与 WebDAV ETag 检测冲突。
 - `private.json` 不会降级写入浏览器 `localStorage`。
-- `/api/icon-proxy` 会校验协议、拦截内网地址、限制重定向次数、设置超时并限制响应体大小。
+- 登录凭据使用 HttpOnly Cookie 保存，前端不保存认证 token。
+- `/api/icon-proxy` 会校验协议、拦截内网地址、绑定解析 IP、限制重定向次数、设置超时并限制响应体大小。
 - 登录限流在 Express 服务和 Vercel Serverless 入口都已启用。
 
 ## 使用说明
@@ -158,6 +176,11 @@ pm2 start server.js --name navilink
 ```
 navilink/
 ├── server.js              # Express 生产服务器
+├── server/                # Express 路由和本地服务模块
+│   ├── authRoutes.js      # 认证路由
+│   ├── storageRoutes.js   # 存储路由
+│   ├── localStorage.js    # 本地 JSON 和存储模式
+│   └── iconProxy.js       # 图标代理
 ├── index.html             # SPA 入口
 ├── App.tsx                # 主应用组件（路由、数据编排）
 ├── types.ts               # TypeScript 类型定义
@@ -176,6 +199,7 @@ navilink/
 │   └── webdavService.ts   # 前端 API 调用封装
 ├── api/                   # Vercel Serverless Functions
 │   └── _shared/           # 后端共享鉴权、限流、数据和 WebDAV 工具
+├── tests/                 # Node 单元测试和 Playwright E2E
 ├── data/                  # 运行时数据（gitignore）
 └── .github/workflows/     # CI/CD
 ```

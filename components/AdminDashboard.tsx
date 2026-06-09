@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PublicData, PrivateData } from '../types';
 import { webdav } from '../services/webdavService';
-import { Button, ToastContainer, ToastMessage, ToastType, ConfirmModal } from './UI';
+import { Button, ToastContainer, ConfirmModal } from './UI';
 import { Menu, Save, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsTab } from './admin/SettingsTab';
@@ -11,6 +11,10 @@ import { StorageTab } from './admin/StorageTab';
 import { AdminSidebar } from './admin/AdminSidebar';
 import { AdminTab, getAdminTabTitle } from './admin/adminLabels';
 import { validatePrivateDataForSave, validatePublicDataForSave } from '../services/validation';
+import { useAdminDraft } from '../hooks/useAdminDraft';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
+import { useStorageStatus } from '../hooks/useStorageStatus';
+import { useToasts } from '../hooks/useToasts';
 
 interface AdminDashboardProps {
   publicData: PublicData;
@@ -26,30 +30,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AdminTab>('cards');
   const [isSaving, setIsSaving] = useState(false);
-  const [localPublic, setLocalPublic] = useState<PublicData>(publicData);
-  const [localPrivate, setLocalPrivate] = useState<PrivateData>(privateData);
-  const [newPassword, setNewPassword] = useState('');
-  const [hasChanges, setHasChanges] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [storageMode, setStorageMode] = useState<'local' | 'webdav'>('local');
-  const [storageAvailable, setStorageAvailable] = useState<{ local: boolean; webdav: boolean }>({ local: true, webdav: false });
-  const [storageStatus, setStorageStatus] = useState<{ local: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; webdav: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; available: { local: boolean; webdav: boolean } } | null>(null);
-  const [storageLoading, setStorageLoading] = useState(false);
-  const [syncing, setSyncing] = useState<'none' | 'localToWebdav' | 'webdavToLocal'>('none');
-
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    setToasts(prev => [...prev, { id: Date.now(), message, type }]);
-  }, []);
-  const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
-
-  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'primary' as 'danger'|'primary' });
-  const confirm = (title: string, message: string, onConfirm: () => void, variant: 'danger'|'primary' = 'primary') => {
-    setConfirmConfig({ isOpen: true, title, message, onConfirm, variant });
-  };
-
-  useEffect(() => { setLocalPublic(publicData); }, [publicData]);
-  useEffect(() => { setLocalPrivate(privateData); setNewPassword(''); }, [privateData]);
+  const { toasts, showToast, removeToast } = useToasts();
+  const { confirmConfig, confirm, closeConfirm } = useConfirmDialog();
+  const {
+    localPublic,
+    localPrivate,
+    newPassword,
+    hasChanges,
+    hasPublicChanges,
+    hasPrivateChanges,
+    setLocalPublic,
+    setLocalPrivate,
+    setNewPassword,
+    updatePublicDraft,
+    updatePrivateDraft,
+    updateNewPassword,
+    replaceDraft,
+    clearChanges
+  } = useAdminDraft({ publicData, privateData });
+  const {
+    storageMode,
+    storageAvailable,
+    storageStatus,
+    storageLoading,
+    syncing,
+    refreshStorageStatus,
+    handleStorageModeChange,
+    handleStorageSync
+  } = useStorageStatus({
+    showToast,
+    hasChanges,
+    confirm,
+    replaceDraft,
+    onUpdatePublic,
+    onUpdatePrivate
+  });
 
   const hasShownPolicyToast = useRef(false);
   useEffect(() => {
@@ -64,95 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
     }
   }, [mustChangePassword, showToast]);
 
-  useEffect(() => {
-    const loadStorage = async () => {
-      try {
-        const info = await webdav.getStorageMode();
-        setStorageMode(info.mode);
-        setStorageAvailable(info.available);
-        const status = await webdav.getStorageStatus();
-        setStorageStatus(status);
-      } catch (error) {
-        showToast('获取存储信息失败', 'error');
-      }
-    };
-    loadStorage();
-  }, [showToast]);
-
-  const refreshRemoteData = async () => {
-    const pub = await webdav.fetchPublicData();
-    const priv = await webdav.fetchPrivateData();
-    setLocalPublic(pub);
-    setLocalPrivate(priv);
-    onUpdatePublic(pub);
-    onUpdatePrivate(priv);
-    setHasChanges(false);
-  };
-
-  const refreshStorageStatus = async () => {
-    try {
-      const status = await webdav.getStorageStatus();
-      setStorageStatus(status);
-    } catch (error) {
-      showToast('获取存储状态失败', 'error');
-    }
-  };
-
-  const handleStorageModeChange = async (mode: 'local' | 'webdav') => {
-    const changeMode = async () => {
-      setStorageLoading(true);
-      try {
-        const info = await webdav.setStorageMode(mode);
-        setStorageMode(info.mode);
-        setStorageAvailable(info.available);
-        await refreshRemoteData();
-        await refreshStorageStatus();
-        showToast('存储模式已切换', 'success');
-      } catch (error) {
-        showToast('切换存储模式失败', 'error');
-      } finally {
-        setStorageLoading(false);
-      }
-    };
-
-    if (hasChanges) {
-      confirm('放弃未保存更改', '切换存储模式会重新加载数据。', changeMode, 'danger');
-      return;
-    }
-
-    await changeMode();
-  };
-
-  const handleStorageSync = (from: 'local' | 'webdav', to: 'local' | 'webdav') => {
-    const labelFrom = from === 'webdav' ? 'WebDAV' : '本地';
-    const labelTo = to === 'webdav' ? 'WebDAV' : '本地';
-    confirm(
-      '覆盖数据',
-      `将用 ${labelFrom} 数据覆盖 ${labelTo}，此操作不可撤销。`,
-      async () => {
-        setSyncing(from === 'webdav' ? 'webdavToLocal' : 'localToWebdav');
-        try {
-          await webdav.syncStorage(from, to);
-          await refreshRemoteData();
-          await refreshStorageStatus();
-          showToast('数据同步完成', 'success');
-        } catch (error) {
-          showToast('数据同步失败', 'error');
-        } finally {
-          setSyncing('none');
-        }
-      },
-      'danger'
-    );
-  };
-
   const handleSave = async () => {
-    const publicError = validatePublicDataForSave(localPublic);
-    if (publicError) {
-      showToast(publicError, 'error');
-      return;
-    }
-
     const privateError = validatePrivateDataForSave(localPrivate, newPassword, mustChangePassword);
     if (privateError) {
       showToast(privateError, 'error');
@@ -160,19 +88,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
       return;
     }
 
+    const shouldSavePublic = hasPublicChanges || !hasPrivateChanges;
+    if (shouldSavePublic) {
+      const publicError = validatePublicDataForSave(localPublic);
+      if (publicError) {
+        showToast(publicError, 'error');
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const privatePayload = newPassword.trim()
         ? { ...localPrivate, admin: { ...localPrivate.admin, passwordHash: newPassword.trim() } }
         : localPrivate;
-      const saved = await webdav.saveAllData(localPublic, privatePayload);
-      onUpdatePublic(saved.publicData);
-      setLocalPublic(saved.publicData);
-      setLocalPrivate(saved.privateData);
-      onUpdatePrivate(saved.privateData);
+      if (shouldSavePublic) {
+        const saved = await webdav.saveAllData(localPublic, privatePayload);
+        onUpdatePublic(saved.publicData);
+        setLocalPublic(saved.publicData);
+        setLocalPrivate(saved.privateData);
+        onUpdatePrivate(saved.privateData);
+      } else {
+        await webdav.savePrivateData(privatePayload);
+        const savedPrivate = await webdav.fetchPrivateData();
+        setLocalPrivate(savedPrivate);
+        onUpdatePrivate(savedPrivate);
+      }
       if (mustChangePassword) onPasswordPolicyResolved();
       setNewPassword('');
-      setHasChanges(false);
+      clearChanges();
       await refreshStorageStatus();
       showToast('设置保存成功', 'success');
     } catch (error) {
@@ -185,13 +129,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
     } finally { setIsSaving(false); }
   };
 
-  const markChanged = () => setHasChanges(true);
-
   return (
     <div className="fixed inset-0 h-screen w-screen flex flex-col md:flex-row bg-canvas overflow-hidden font-sans text-1">
       <ToastContainer messages={toasts} onRemove={removeToast} />
       <ConfirmModal 
-        isOpen={confirmConfig.isOpen} onClose={() => setConfirmConfig(p=>({...p, isOpen: false}))} 
+        isOpen={confirmConfig.isOpen} onClose={closeConfirm} 
         onConfirm={confirmConfig.onConfirm} title={confirmConfig.title} message={confirmConfig.message} variant={confirmConfig.variant}
       />
 
@@ -211,7 +153,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
           <aside className="relative w-72 bg-surface-raised border-r border-subtle flex flex-col h-full shadow-popover animate-in slide-in-from-left duration-300">
-             <button className="absolute top-4 right-4 w-9 h-9 rounded-control flex items-center justify-center text-2 hover:text-1 hover:bg-subtle transition-colors" onClick={() => setIsMobileMenuOpen(false)}><X size={20}/></button>
+             <button aria-label="关闭菜单" className="absolute top-4 right-4 w-9 h-9 rounded-control flex items-center justify-center text-2 hover:text-1 hover:bg-subtle transition-colors" onClick={() => setIsMobileMenuOpen(false)}><X size={20}/></button>
              <AdminSidebar
                activeTab={activeTab}
                mustChangePassword={mustChangePassword}
@@ -227,7 +169,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
       <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-canvas">
         <header className="flex-shrink-0 flex justify-between items-center p-4 md:px-10 md:py-6 bg-canvas/75 backdrop-blur-xl border-b border-subtle/70">
           <div className="flex items-center gap-3">
-             <button className="md:hidden w-9 h-9 -ml-1 rounded-control flex items-center justify-center text-2 hover:bg-subtle hover:text-1 transition-colors" onClick={() => setIsMobileMenuOpen(true)}>
+             <button aria-label="打开菜单" className="md:hidden w-9 h-9 -ml-1 rounded-control flex items-center justify-center text-2 hover:bg-subtle hover:text-1 transition-colors" onClick={() => setIsMobileMenuOpen(true)}>
                <Menu size={24} />
              </button>
             <h2 className="text-xl md:text-[28px] font-semibold tracking-tight-display text-1">
@@ -260,13 +202,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
                   dataP={localPublic} 
                   dataV={localPrivate} 
                   newPassword={newPassword}
-                  onP={d=>{setLocalPublic(d); markChanged();}} 
-                  onV={d=>{setLocalPrivate(d); markChanged();}}
-                  onNewPasswordChange={value=>{setNewPassword(value); markChanged();}}
+                  onP={updatePublicDraft} 
+                  onV={updatePrivateDraft}
+                  onNewPasswordChange={updateNewPassword}
                 />
               )}
-              {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
-              {activeTab === 'categories' && <CategoriesTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}
+              {activeTab === 'cards' && <CardsTab data={localPublic} onChange={updatePublicDraft} confirm={confirm} />}
+              {activeTab === 'categories' && <CategoriesTab data={localPublic} onChange={updatePublicDraft} confirm={confirm} />}
               {activeTab === 'storage' && (
                 <StorageTab
                   storageMode={storageMode}

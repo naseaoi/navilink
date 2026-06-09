@@ -74,8 +74,17 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
 
   const openEdit = (card: LinkCard) => { setEditingCard(card); setIsModalOpen(true); };
 
+  const isHttpUrl = (value: string) => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   const save = () => {
-    if (!editingCard.title || !editingCard.url) return;
+    if (!editingCard.title || !editingCard.url || !isHttpUrl(editingCard.url)) return;
     const cards = [...data.cards];
     const idx = cards.findIndex(c => c.id === editingCard.id);
 
