@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, theme, onToggleThe
 
   return (
     <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 p-3.5 md:block">
-      <div className="flex h-full w-full flex-col rounded-3xl border border-subtle bg-surface p-4 shadow-card">
+      <div className="flex h-full w-full flex-col rounded-3xl border border-[rgb(var(--border-subtle)/0.58)] bg-surface/95 p-4 shadow-card dark:border-[rgb(var(--border-default)/0.36)]">
         <div className="flex aspect-square w-full items-center justify-center pr-4">
           <BrandMark onClick={onLogoClick} className="text-[64px]" />
         </div>

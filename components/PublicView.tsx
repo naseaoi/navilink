@@ -9,19 +9,21 @@ import { CachedIcon } from './public/CachedIcon';
 
 interface PublicViewProps {
   data: PublicData;
+  hasFetchedData: boolean;
   theme?: 'light' | 'dark' | 'system';
   onToggleTheme?: () => void;
 }
 
 export interface PublicOutletContext {
   data: PublicData;
+  hasFetchedData: boolean;
   onCardClick: (card: LinkCard) => void;
   onSearchOpen: () => void;
 }
 
 export const usePublicOutlet = () => useOutletContext<PublicOutletContext>();
 
-export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', onToggleTheme }) => {
+export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, theme = 'system', onToggleTheme }) => {
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,6 +89,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, theme = 'system', 
 
   const outletContext: PublicOutletContext = {
     data,
+    hasFetchedData,
     onCardClick: setConfirmCard,
     onSearchOpen: () => setIsSearchOpen(true)
   };

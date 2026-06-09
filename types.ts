@@ -41,7 +41,7 @@ export interface PrivateData {
 
 export interface AppState {
   publicData: PublicData;
-  isLoading: boolean;
+  hasFetchedPublicData: boolean;
   error: string | null;
 }
 

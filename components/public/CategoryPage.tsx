@@ -8,13 +8,13 @@ import { getCategoryIcon, sortCategories } from './categoryIcons';
 
 export const CategoryPage: React.FC = () => {
   const { categoryId } = useParams();
-  const { data, onCardClick } = usePublicOutlet();
+  const { data, hasFetchedData, onCardClick } = usePublicOutlet();
 
   const sorted = sortCategories(data.categories);
   const index = sorted.findIndex((c) => c.id === categoryId);
   const category = index >= 0 ? sorted[index] : undefined;
 
-  if (!category) return <Navigate to="/" replace />;
+  if (!category) return hasFetchedData ? <Navigate to="/" replace /> : null;
 
   const Icon = getCategoryIcon(index);
   const cards = data.cards.filter((c) => c.categoryId === category.id).sort((a, b) => a.order - b.order);
@@ -68,10 +68,10 @@ const CardItem: React.FC<{ card: LinkCard; onClick: () => void; style?: React.CS
     type="button"
     onClick={onClick}
     style={style}
-    className="animate-card-enter group flex h-full flex-col gap-4 overflow-hidden rounded-card border border-subtle bg-surface p-5 text-left shadow-card transition-all duration-300 ease-spring hover:-translate-y-0.5 hover:border-default hover:shadow-card-hover"
+    className="animate-card-enter group flex h-full flex-col gap-4 overflow-hidden rounded-card border border-[rgb(var(--border-subtle)/0.58)] bg-surface/95 p-5 text-left shadow-[0_12px_34px_-28px_rgb(15_23_42/0.34)] transition-all duration-300 ease-spring hover:-translate-y-0.5 hover:border-[rgb(var(--border-default)/0.58)] hover:shadow-[0_18px_42px_-30px_rgb(15_23_42/0.42)] dark:border-[rgb(var(--border-default)/0.36)] dark:shadow-[0_14px_38px_-30px_rgb(0_0_0/0.72)]"
   >
     <div className="flex items-start justify-between">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control border border-subtle bg-subtle transition-all duration-300 ease-spring group-hover:border-accent/30 group-hover:bg-accent-soft">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control border border-[rgb(var(--border-subtle)/0.56)] bg-subtle/80 transition-all duration-300 ease-spring group-hover:border-accent/25 group-hover:bg-accent-soft">
         <CachedIcon icon={card.icon} siteUrl={card.url} alt={card.title} className="h-7 w-7 object-contain" />
       </div>
       <span className="flex h-8 w-8 items-center justify-center rounded-full text-3 transition-colors group-hover:bg-accent-soft group-hover:text-accent">

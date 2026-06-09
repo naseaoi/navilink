@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AppLoading } from './components/AppLoading';
 import { PublicView } from './components/PublicView';
 import { HomePage } from './components/public/HomePage';
 import { CategoryPage } from './components/public/CategoryPage';
@@ -21,7 +20,7 @@ const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((mo
 const MainApp = () => {
   const [state, setState] = useState<AppState>({
     publicData: { settings: { title: 'NaviLink', icon: '' }, categories: [], cards: [] },
-    isLoading: true,
+    hasFetchedPublicData: false,
     error: null
   });
   const [privateData, setPrivateData] = useState<PrivateData | null>(null);
@@ -35,9 +34,9 @@ const MainApp = () => {
     const init = async () => {
       try {
         const pub = await webdav.fetchPublicData();
-        setState(prev => ({ ...prev, publicData: pub, isLoading: false }));
+        setState(prev => ({ ...prev, publicData: pub, hasFetchedPublicData: true }));
       } catch (e) {
-        setState(prev => ({ ...prev, isLoading: false, error: '无法同步远程数据' }));
+        setState(prev => ({ ...prev, hasFetchedPublicData: true, error: '无法同步远程数据' }));
       }
     };
     init();
@@ -71,18 +70,16 @@ const MainApp = () => {
     setMustChangePassword(false);
   };
 
-  if (state.isLoading) return <AppLoading withLabel />;
-
   return (
     <Routes>
-      <Route element={<PublicView data={state.publicData} theme={theme} onToggleTheme={toggleTheme} />}>
+      <Route element={<PublicView data={state.publicData} hasFetchedData={state.hasFetchedPublicData} theme={theme} onToggleTheme={toggleTheme} />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/c/:categoryId" element={<CategoryPage />} />
       </Route>
       <Route path="/tat" element={
         isAuthenticated ? (
           privateData ? (
-            <Suspense fallback={<AppLoading />}>
+            <Suspense fallback={null}>
               <AdminDashboard
                 publicData={state.publicData}
                 privateData={privateData}
@@ -94,7 +91,7 @@ const MainApp = () => {
               />
             </Suspense>
           ) : (
-            <AppLoading />
+            null
           )
         ) : (
           <AdminLogin onLogin={(nextMustChangePassword) => {

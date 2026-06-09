@@ -163,7 +163,6 @@ navilink/
 ├── types.ts               # TypeScript 类型定义
 ├── components/
 │   ├── UI.tsx             # 通用 UI 组件库
-│   ├── AppLoading.tsx     # 全局加载状态
 │   ├── PublicView.tsx     # 导航首页
 │   ├── AdminDashboard.tsx # 管理后台
 │   ├── public/            # 首页子组件

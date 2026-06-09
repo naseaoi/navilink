@@ -13,7 +13,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({ onOpen, placeholder = 'æ
     <button
       type="button"
       onClick={onOpen}
-      className="group flex w-full max-w-3xl items-center gap-3.5 rounded-2xl border border-subtle bg-surface p-2.5 pr-4 shadow-card transition-all duration-300 ease-spring hover:-translate-y-0.5 hover:border-default hover:shadow-card-hover"
+      className="group flex w-full max-w-3xl items-center gap-3.5 rounded-3xl border border-[rgb(var(--border-subtle)/0.58)] bg-surface/95 p-2.5 pr-4 shadow-card transition-all duration-300 ease-spring hover:-translate-y-0.5 hover:border-[rgb(var(--border-default)/0.58)] hover:shadow-card-hover dark:border-[rgb(var(--border-default)/0.36)]"
     >
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent transition-transform duration-300 ease-spring group-hover:scale-105">
         <Search size={22} strokeWidth={2.2} />
