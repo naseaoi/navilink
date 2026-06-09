@@ -50,13 +50,15 @@ test('管理员可新增卡片', async ({ page }) => {
   await page.getByRole('button', { name: '返回首页' }).click();
   await page.getByRole('button', { name: /搜索网站或工具/ }).click();
   await page.getByPlaceholder('搜索网站或工具...').fill('Example');
-  await expect(page.getByText('Example')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Example Example https:\/\/example\.com\// })).toBeVisible();
 });
 
 test('管理员可删除卡片', async ({ page }) => {
   await login(page, 'admin12345');
   await page.getByRole('button', { name: '卡片管理' }).click();
-  await page.getByRole('button', { name: '删除 Example' }).click();
+  const card = page.locator('[data-card-id]').filter({ has: page.getByRole('heading', { name: 'Example' }) });
+  await card.click();
+  await card.getByRole('button', { name: '删除 Example' }).click();
   await expect(page.getByText('删除卡片')).toBeVisible();
   await page.getByRole('button', { name: '确认' }).click();
   await expect(page.getByText('Example')).toBeHidden();
@@ -67,10 +69,8 @@ test('管理员可新增并删除分类', async ({ page }) => {
   await login(page, 'admin12345');
   await page.getByRole('button', { name: '分类管理' }).click();
   await page.getByRole('button', { name: '新增' }).click();
-  await expect(page.getByText('新分类')).toBeVisible();
-  await page.getByRole('button', { name: '编辑 新分类' }).click();
-  await page.locator('input').last().fill('资料库');
-  await page.getByRole('button', { name: '保存' }).click();
+  await page.getByLabel('分类名称').fill('资料库');
+  await page.getByRole('button', { name: '确认 新分类' }).click();
   await expect(page.getByText('资料库')).toBeVisible();
   await page.getByRole('button', { name: '删除 资料库' }).click();
   await expect(page.getByText('删除分类')).toBeVisible();
@@ -101,8 +101,8 @@ test('存储模式切换会提示放弃未保存更改', async ({ page }) => {
   await page.getByRole('button', { name: '网站设置' }).click();
   await page.getByLabel('站点标题').fill('未保存标题');
   await page.getByRole('button', { name: '数据存储' }).click();
-  await page.getByRole('button', { name: '本地存储' }).click();
-  await page.getByRole('button', { name: 'WebDAV' }).click();
+  await page.getByRole('button', { name: '本地存储', exact: true }).click();
+  await page.getByRole('button', { name: 'WebDAV', exact: true }).click();
   await expect(page.getByText('放弃未保存更改')).toBeVisible();
   await page.getByRole('button', { name: '取消' }).click();
 });
