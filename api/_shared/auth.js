@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 export const DEFAULT_ADMIN_PASSWORD = 'admin123';
+export const AUTH_COOKIE_NAME = 'navilink_session';
 
 const base64UrlEncode = (input) => Buffer.from(input).toString('base64url');
 const base64UrlDecode = (input) => Buffer.from(input, 'base64url').toString();
@@ -65,7 +66,29 @@ export const createDefaultPrivateData = () => ({
 export const getAuthToken = (request) => {
   const header = request.headers.authorization || '';
   if (header.startsWith('Bearer ')) return header.slice('Bearer '.length);
+  const cookieHeader = request.headers.cookie || '';
+  const cookies = Object.fromEntries(
+    cookieHeader
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const index = part.indexOf('=');
+        if (index === -1) return [part, ''];
+        return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+      })
+  );
+  if (cookies[AUTH_COOKIE_NAME]) return cookies[AUTH_COOKIE_NAME];
   return null;
 };
 
 export const getAuthPayload = (request, secret) => verifyToken(getAuthToken(request), secret);
+
+const cookieSecurity = () => (process.env.NODE_ENV === 'production' || process.env.VERCEL ? '; Secure' : '');
+
+export const buildAuthCookie = (token, exp) => {
+  const maxAge = Math.max(0, Math.floor((exp - Date.now()) / 1000));
+  return `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${cookieSecurity()}`;
+};
+
+export const buildClearAuthCookie = () => `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${cookieSecurity()}`;

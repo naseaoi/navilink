@@ -165,18 +165,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
       const privatePayload = newPassword.trim()
         ? { ...localPrivate, admin: { ...localPrivate.admin, passwordHash: newPassword.trim() } }
         : localPrivate;
-      await webdav.savePublicData(localPublic);
-      await webdav.savePrivateData(privatePayload);
-      const savedPrivate = await webdav.fetchPrivateData();
-      onUpdatePublic(localPublic);
-      setLocalPrivate(savedPrivate);
-      onUpdatePrivate(savedPrivate);
+      const saved = await webdav.saveAllData(localPublic, privatePayload);
+      onUpdatePublic(saved.publicData);
+      setLocalPublic(saved.publicData);
+      setLocalPrivate(saved.privateData);
+      onUpdatePrivate(saved.privateData);
       if (mustChangePassword) onPasswordPolicyResolved();
       setNewPassword('');
       setHasChanges(false);
       await refreshStorageStatus();
       showToast('设置保存成功', 'success');
     } catch (error) {
+      if (error instanceof Error && error.message === 'DATA_CONFLICT') {
+        showToast('数据已被其他位置更新，请刷新后再保存', 'error');
+        await refreshStorageStatus();
+        return;
+      }
       showToast('保存失败', 'error');
     } finally { setIsSaving(false); }
   };

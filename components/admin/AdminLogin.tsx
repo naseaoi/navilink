@@ -21,12 +21,13 @@ export const AdminLogin: React.FC<{ onLogin: (mustChangePassword: boolean) => vo
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ username, password, remember })
       });
 
       if (!response.ok) throw new Error('Invalid credentials');
-      const { token, exp, mustChangePassword } = await response.json();
-      saveAuthSession(token, exp, !!mustChangePassword);
+      const { exp, mustChangePassword } = await response.json();
+      saveAuthSession(exp, !!mustChangePassword);
       onLogin(!!mustChangePassword);
     } catch (e) {
       setError('凭据无效');

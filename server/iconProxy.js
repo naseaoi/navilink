@@ -4,6 +4,42 @@ import net from 'net';
 const ICON_PROXY_MAX_BYTES = 5 * 1024 * 1024;
 const ICON_PROXY_TIMEOUT_MS = 10_000;
 const ICON_PROXY_MAX_REDIRECTS = 3;
+const ICON_PROXY_WINDOW_MS = 60_000;
+const ICON_PROXY_MAX_REQUESTS = 120;
+const ICON_PROXY_FAILURE_TTL_MS = 5 * 60_000;
+const rateBuckets = new Map();
+const failedTargets = new Map();
+
+const getClientIp = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
+  if (Array.isArray(forwarded) && forwarded[0]) return forwarded[0].split(',')[0].trim();
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+};
+
+const checkRateLimit = (req) => {
+  const key = getClientIp(req);
+  const now = Date.now();
+  const bucket = rateBuckets.get(key);
+  if (!bucket || now - bucket.startedAt > ICON_PROXY_WINDOW_MS) {
+    rateBuckets.set(key, { count: 1, startedAt: now });
+    return { limited: false, retryAfterSeconds: 0 };
+  }
+  bucket.count += 1;
+  rateBuckets.set(key, bucket);
+  if (bucket.count <= ICON_PROXY_MAX_REQUESTS) return { limited: false, retryAfterSeconds: 0 };
+  return { limited: true, retryAfterSeconds: Math.ceil((ICON_PROXY_WINDOW_MS - (now - bucket.startedAt)) / 1000) };
+};
+
+const hasRecentFailure = (target) => {
+  const failedAt = failedTargets.get(target);
+  if (!failedAt) return false;
+  if (Date.now() - failedAt > ICON_PROXY_FAILURE_TTL_MS) {
+    failedTargets.delete(target);
+    return false;
+  }
+  return true;
+};
 
 const isBlockedIpv4 = (address) => {
   const parts = address.split('.').map(Number);
@@ -93,6 +129,16 @@ export const createIconProxyHandler = () => async (req, res) => {
   const target = String(req.query.url || '').trim();
   if (!target) return res.status(400).json({ error: 'missing url' });
 
+  const rateState = checkRateLimit(req);
+  if (rateState.limited) {
+    res.set('Retry-After', String(rateState.retryAfterSeconds));
+    return res.status(429).json({ error: 'too many requests' });
+  }
+
+  if (hasRecentFailure(target)) {
+    return res.status(502).json({ error: 'recent fetch failed' });
+  }
+
   let parsed;
   try {
     parsed = new URL(target);
@@ -103,10 +149,12 @@ export const createIconProxyHandler = () => async (req, res) => {
   try {
     const upstream = await fetchIconWithRedirects(parsed, ICON_PROXY_MAX_REDIRECTS);
     if (!upstream.ok) {
+      failedTargets.set(target, Date.now());
       return res.status(502).json({ error: `upstream ${upstream.status}` });
     }
     const contentType = upstream.headers.get('content-type') || 'image/png';
-    if (!/^image\//i.test(contentType) && !/octet-stream/i.test(contentType)) {
+    if (!/^image\//i.test(contentType)) {
+      failedTargets.set(target, Date.now());
       return res.status(415).json({ error: 'not an image' });
     }
     const contentLength = Number(upstream.headers.get('content-length') || 0);
@@ -119,6 +167,7 @@ export const createIconProxyHandler = () => async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     return res.send(buf);
   } catch (error) {
+    failedTargets.set(target, Date.now());
     console.error(`[Icon Proxy] ${target} -> ${error.message}`);
     if (error.message === 'blocked host' || error.message === 'unsupported protocol') {
       return res.status(400).json({ error: error.message });

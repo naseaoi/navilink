@@ -46,20 +46,10 @@ class WebDavService {
     return this.publicDataSource;
   }
 
-  private getAuthToken(): string | null {
-    return localStorage.getItem('navilink_token');
-  }
-
-  private getAuthHeaders(): Record<string, string> {
-    const token = this.getAuthToken();
-    if (!token) throw new Error('Not authenticated');
-    return { Authorization: `Bearer ${token}` };
-  }
-
   async getStorageMode(): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
     const response = await fetch('/api/storage/mode', {
       method: 'GET',
-      headers: this.getAuthHeaders()
+      credentials: 'same-origin'
     });
     if (!response.ok) throw new Error('Failed to load storage mode');
     return response.json();
@@ -68,9 +58,9 @@ class WebDavService {
   async setStorageMode(mode: 'local' | 'webdav'): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
     const response = await fetch('/api/storage/mode', {
       method: 'PUT',
+      credentials: 'same-origin',
       headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders()
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ mode })
     });
@@ -81,9 +71,9 @@ class WebDavService {
   async syncStorage(from: 'local' | 'webdav', to: 'local' | 'webdav'): Promise<void> {
     const response = await fetch('/api/storage/sync', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders()
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ from, to })
     });
@@ -93,7 +83,7 @@ class WebDavService {
   async getStorageStatus(): Promise<{ local: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; webdav: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; available: { local: boolean; webdav: boolean } }> {
     const response = await fetch('/api/storage/status', {
       method: 'GET',
-      headers: this.getAuthHeaders()
+      credentials: 'same-origin'
     });
     if (!response.ok) throw new Error('Failed to load storage status');
     return response.json();
@@ -104,6 +94,7 @@ class WebDavService {
       // Use the Vercel API Proxy
       const response = await fetch('/api/webdav?file=public.json', {
         method: 'GET',
+        credentials: 'same-origin'
       });
 
       if (response.status === 404) {
@@ -143,9 +134,9 @@ class WebDavService {
     try {
       const response = await fetch('/api/webdav?file=public.json', {
         method: 'PUT',
+        credentials: 'same-origin',
         headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeaders()
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)
       });
@@ -162,7 +153,7 @@ class WebDavService {
   async fetchPrivateData(): Promise<PrivateData> {
     const response = await fetch('/api/webdav?file=private.json', {
       method: 'GET',
-      headers: this.getAuthHeaders(),
+      credentials: 'same-origin'
     });
 
     if (response.status === 404) {
@@ -178,13 +169,34 @@ class WebDavService {
   async savePrivateData(data: PrivateData): Promise<void> {
     const response = await fetch('/api/webdav?file=private.json', {
       method: 'PUT',
+      credentials: 'same-origin',
       headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders()
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error('Failed to save private data');
+  }
+
+  async saveAllData(publicData: PublicData, privateData: PrivateData): Promise<{ publicData: PublicData; privateData: PrivateData }> {
+    const response = await fetch('/api/storage/save', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        publicData,
+        privateData,
+        expected: {
+          publicUpdatedAt: publicData._meta?.updatedAt ?? null,
+          privateUpdatedAt: privateData._meta?.updatedAt ?? null
+        }
+      })
+    });
+    if (response.status === 409) throw new Error('DATA_CONFLICT');
+    if (!response.ok) throw new Error('Failed to save data');
+    return response.json();
   }
 }
 

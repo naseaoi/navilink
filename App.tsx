@@ -10,7 +10,8 @@ import {
   clearAuthSession,
   clearPasswordPolicyFlag,
   hasPasswordPolicyFlag,
-  hasValidAuthSession
+  hasValidAuthSession,
+  logoutAuthSession
 } from './services/authSession';
 import { webdav } from './services/webdavService';
 import { AppState, PrivateData } from './types';
@@ -60,8 +61,8 @@ const MainApp = () => {
     loadPrivate();
   }, [isAuthenticated]);
 
-  const handleLogout = () => {
-    clearAuthSession();
+  const handleLogout = async () => {
+    await logoutAuthSession();
     setPrivateData(null);
     setIsAuthenticated(false);
     setMustChangePassword(false);

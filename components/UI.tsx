@@ -40,6 +40,7 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { lab
   <div className="w-full">
     {label && <label className="mb-1.5 block text-[12.5px] font-medium text-2">{label}</label>}
     <input
+      aria-label={props['aria-label'] || label}
       className={`flex h-11 w-full rounded-control border border-subtle bg-surface px-3.5 text-[13.5px] text-1
         transition-all duration-200 placeholder:text-3
         hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none ${className}`}
@@ -198,6 +199,7 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
       <div className="relative">
         <input
           type={show ? 'text' : 'password'}
+          aria-label={props['aria-label'] || label}
           className={`flex h-11 w-full rounded-control border border-subtle bg-surface pl-3.5 pr-10 text-[13.5px] text-1
             transition-all duration-200 placeholder:text-3
             hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none ${className}`}

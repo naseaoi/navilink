@@ -28,3 +28,8 @@ data/.auth_secret
 *.njsproj
 *.sln
 *.sw?
+
+# Test artifacts
+test-results/
+playwright-report/
+tmp/

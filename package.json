@@ -10,6 +10,7 @@
     "version:check": "node scripts/check-release-version.mjs",
     "lint": "eslint .",
     "test": "node --test tests/*.test.js",
+    "test:e2e": "npm run build && playwright test",
     "typecheck": "tsc --noEmit",
     "build": "npm run lint && npm run test && npm run typecheck && vite build",
     "preview": "vite preview",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^20.14.9",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

@@ -104,7 +104,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
           onChange={setFilterCat} 
           className="w-auto min-w-[120px] max-w-[50%]" 
         />
-        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-control w-10 h-10 shrink-0"><Plus size={20}/></Button>
+        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-control w-10 h-10 shrink-0" title="新增卡片"><Plus size={20}/></Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-x-6 gap-y-6">

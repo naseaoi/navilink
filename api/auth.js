@@ -1,5 +1,7 @@
 import {
   DEFAULT_ADMIN_PASSWORD,
+  buildAuthCookie,
+  buildClearAuthCookie,
   createDefaultPrivateData,
   getAuthPayload,
   normalizePrivateData,
@@ -24,6 +26,11 @@ export default async function handler(request, response) {
     const payload = getAuthPayload(request, AUTH_SECRET);
     if (!payload) return response.status(401).json({ ok: false });
     return response.json({ ok: true, exp: payload.exp, mustChangePassword: !!payload.mustChangePassword });
+  }
+
+  if (request.method === 'DELETE') {
+    response.setHeader('Set-Cookie', buildClearAuthCookie());
+    return response.json({ ok: true });
   }
 
   if (request.method !== 'POST') {
@@ -70,7 +77,8 @@ export default async function handler(request, response) {
     const duration = remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     const exp = Date.now() + duration;
     const token = signToken({ username, exp, mustChangePassword }, AUTH_SECRET);
-    return response.json({ token, exp, mustChangePassword });
+    response.setHeader('Set-Cookie', buildAuthCookie(token, exp));
+    return response.json({ exp, mustChangePassword });
   } catch (error) {
     console.error('[Auth] Exception:', error);
     return response.status(500).json({ error: 'Auth Error', message: error.message });
