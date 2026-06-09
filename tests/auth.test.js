@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { hashPassword, signToken, verifyPassword, verifyToken } from '../api/_shared/auth.js';
+import {
+  buildAuthCookie,
+  buildClearAuthCookie,
+  hashPassword,
+  signToken,
+  verifyPassword,
+  verifyToken
+} from '../api/_shared/auth.js';
 import { loginAdmin } from '../api/_shared/authService.js';
 import { createLoginRateLimiter } from '../api/_shared/rateLimit.js';
 
@@ -26,6 +33,30 @@ describe('auth helpers', () => {
 
   it('rejects broken scrypt hashes', () => {
     assert.equal(verifyPassword('admin123', 'scrypt$salt$hash'), false);
+  });
+
+  it('uses configurable cookie attributes', () => {
+    const previous = {
+      COOKIE_SAMESITE: process.env.COOKIE_SAMESITE,
+      COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
+      COOKIE_SECURE: process.env.COOKIE_SECURE
+    };
+    process.env.COOKIE_SAMESITE = 'None';
+    process.env.COOKIE_DOMAIN = '.example.com';
+    process.env.COOKIE_SECURE = 'false';
+    try {
+      const cookie = buildAuthCookie('token', Date.now() + 1000);
+      const clearCookie = buildClearAuthCookie();
+      assert.match(cookie, /SameSite=None/);
+      assert.match(cookie, /Domain=.example.com/);
+      assert.match(cookie, /Secure/);
+      assert.match(clearCookie, /Max-Age=0/);
+    } finally {
+      Object.entries(previous).forEach(([key, value]) => {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      });
+    }
   });
 });
 

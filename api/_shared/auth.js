@@ -84,11 +84,37 @@ export const getAuthToken = (request) => {
 
 export const getAuthPayload = (request, secret) => verifyToken(getAuthToken(request), secret);
 
-const cookieSecurity = () => (process.env.NODE_ENV === 'production' || process.env.VERCEL ? '; Secure' : '');
+const getCookieOptions = (env = process.env) => {
+  const sameSiteInput = String(env.COOKIE_SAMESITE || 'Lax').trim().toLowerCase();
+  const sameSiteMap = { lax: 'Lax', strict: 'Strict', none: 'None' };
+  const sameSite = sameSiteMap[sameSiteInput] || 'Lax';
+  const configuredSecure = env.COOKIE_SECURE
+    ? ['1', 'true', 'yes'].includes(String(env.COOKIE_SECURE).trim().toLowerCase())
+    : env.NODE_ENV === 'production' || !!env.VERCEL;
+  const secure = configuredSecure || sameSite === 'None';
+  const domain = String(env.COOKIE_DOMAIN || '').trim();
+  return {
+    sameSite,
+    secure,
+    domain
+  };
+};
+
+const buildCookieAttributes = (maxAge, env = process.env) => {
+  const options = getCookieOptions(env);
+  return [
+    'Path=/',
+    'HttpOnly',
+    `SameSite=${options.sameSite}`,
+    `Max-Age=${maxAge}`,
+    options.domain ? `Domain=${options.domain}` : '',
+    options.secure ? 'Secure' : ''
+  ].filter(Boolean).join('; ');
+};
 
 export const buildAuthCookie = (token, exp) => {
   const maxAge = Math.max(0, Math.floor((exp - Date.now()) / 1000));
-  return `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${cookieSecurity()}`;
+  return `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; ${buildCookieAttributes(maxAge)}`;
 };
 
-export const buildClearAuthCookie = () => `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${cookieSecurity()}`;
+export const buildClearAuthCookie = () => `${AUTH_COOKIE_NAME}=; ${buildCookieAttributes(0)}`;

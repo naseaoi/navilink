@@ -1,7 +1,7 @@
 import { getAuthPayload } from '../_shared/auth.js';
 import { withTimestamp } from '../_shared/data.js';
 import { prepareSaveData } from '../_shared/saveData.js';
-import { fetchWebDavJson, getWebDavEnv, hasWebDavConfig, putWebDavJsonBatch } from '../_shared/webdav.js';
+import { fetchWebDavJsonWithMeta, getWebDavEnv, hasWebDavConfig, putWebDavJsonBatch } from '../_shared/webdav.js';
 
 export default async function handler(request, response) {
   const { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH, AUTH_SECRET } = process.env;
@@ -16,11 +16,11 @@ export default async function handler(request, response) {
 
   try {
     const env = getWebDavEnv({ WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH });
-    const currentPublic = await fetchWebDavJson('public.json', env);
-    const currentPrivate = await fetchWebDavJson('private.json', env);
+    const currentPublic = await fetchWebDavJsonWithMeta('public.json', env);
+    const currentPrivate = await fetchWebDavJsonWithMeta('private.json', env);
     const prepared = prepareSaveData({
-      currentPublic,
-      currentPrivate,
+      currentPublic: currentPublic.data,
+      currentPrivate: currentPrivate.data,
       publicData: request.body?.publicData,
       privateData: request.body?.privateData,
       expected: request.body?.expected
@@ -29,12 +29,22 @@ export default async function handler(request, response) {
     const savedPrivate = withTimestamp('private.json', prepared.privateData);
     await putWebDavJsonBatch({
       entries: [
-        { fileName: 'public.json', data: savedPublic },
-        { fileName: 'private.json', data: savedPrivate }
+        {
+          fileName: 'public.json',
+          data: savedPublic,
+          ifMatch: currentPublic.etag,
+          ifNoneMatch: currentPublic.data == null
+        },
+        {
+          fileName: 'private.json',
+          data: savedPrivate,
+          ifMatch: currentPrivate.etag,
+          ifNoneMatch: currentPrivate.data == null
+        }
       ],
       originals: {
-        'public.json': currentPublic,
-        'private.json': currentPrivate
+        'public.json': currentPublic.data,
+        'private.json': currentPrivate.data
       },
       env
     });

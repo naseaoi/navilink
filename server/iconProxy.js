@@ -1,4 +1,6 @@
 import { lookup } from 'dns/promises';
+import http from 'http';
+import https from 'https';
 import net from 'net';
 
 const ICON_PROXY_MAX_BYTES = 5 * 1024 * 1024;
@@ -84,45 +86,86 @@ const assertSafeProxyUrl = async (targetUrl) => {
   if (!records.length || records.some((record) => isBlockedIp(record.address))) {
     throw new Error('blocked host');
   }
+  return records[0];
 };
 
-const fetchIconWithRedirects = async (targetUrl, redirectsLeft) => {
-  await assertSafeProxyUrl(targetUrl);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ICON_PROXY_TIMEOUT_MS);
-  try {
-    const response = await fetch(targetUrl.toString(), {
+const createPinnedLookup = (record) => (_hostname, _options, callback) => {
+  callback(null, record.address, record.family);
+};
+
+const getHeader = (headers, name) => {
+  const value = headers[name.toLowerCase()];
+  if (Array.isArray(value)) return value[0] || '';
+  return value || '';
+};
+
+const buildHostHeader = (targetUrl) => {
+  if (!targetUrl.port) return targetUrl.hostname;
+  return `${targetUrl.hostname}:${targetUrl.port}`;
+};
+
+const requestIcon = async (targetUrl) => {
+  const resolved = await assertSafeProxyUrl(targetUrl);
+  const transport = targetUrl.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = transport.request({
+      protocol: targetUrl.protocol,
+      hostname: targetUrl.hostname,
+      port: targetUrl.port || undefined,
+      path: `${targetUrl.pathname}${targetUrl.search}`,
       method: 'GET',
-      redirect: 'manual',
-      signal: controller.signal,
+      lookup: createPinnedLookup(resolved),
+      servername: targetUrl.hostname,
+      timeout: ICON_PROXY_TIMEOUT_MS,
       headers: {
+        Host: buildHostHeader(targetUrl),
         'User-Agent': 'NaviLink-IconProxy/1.0',
         Accept: 'image/*,*/*;q=0.8'
       }
+    }, (response) => {
+      const contentLength = Number(response.headers['content-length'] || 0);
+      if (contentLength > ICON_PROXY_MAX_BYTES) {
+        response.resume();
+        reject(new Error('too large'));
+        return;
+      }
+
+      const chunks = [];
+      let total = 0;
+      response.on('data', (chunk) => {
+        total += chunk.length;
+        if (total > ICON_PROXY_MAX_BYTES) {
+          response.destroy(new Error('too large'));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.on('end', () => {
+        resolve({
+          status: response.statusCode || 0,
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          headers: response.headers,
+          body: Buffer.concat(chunks)
+        });
+      });
+      response.on('error', reject);
     });
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-      if (redirectsLeft <= 0) throw new Error('too many redirects');
-      const location = response.headers.get('location');
-      if (!location) throw new Error('missing redirect location');
-      return fetchIconWithRedirects(new URL(location, targetUrl), redirectsLeft - 1);
-    }
-    return response;
-  } finally {
-    clearTimeout(timeout);
-  }
+
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+    req.end();
+  });
 };
 
-const readLimitedResponse = async (response) => {
-  const chunks = [];
-  let total = 0;
-  for await (const chunk of response.body) {
-    total += chunk.length;
-    if (total > ICON_PROXY_MAX_BYTES) {
-      throw new Error('too large');
-    }
-    chunks.push(chunk);
+const fetchIconWithRedirects = async (targetUrl, redirectsLeft) => {
+  const response = await requestIcon(targetUrl);
+  if ([301, 302, 303, 307, 308].includes(response.status)) {
+    if (redirectsLeft <= 0) throw new Error('too many redirects');
+    const location = getHeader(response.headers, 'location');
+    if (!location) throw new Error('missing redirect location');
+    return fetchIconWithRedirects(new URL(location, targetUrl), redirectsLeft - 1);
   }
-  return Buffer.concat(chunks);
+  return response;
 };
 
 export const createIconProxyHandler = () => async (req, res) => {
@@ -152,20 +195,19 @@ export const createIconProxyHandler = () => async (req, res) => {
       failedTargets.set(target, Date.now());
       return res.status(502).json({ error: `upstream ${upstream.status}` });
     }
-    const contentType = upstream.headers.get('content-type') || 'image/png';
+    const contentType = getHeader(upstream.headers, 'content-type') || 'image/png';
     if (!/^image\//i.test(contentType)) {
       failedTargets.set(target, Date.now());
       return res.status(415).json({ error: 'not an image' });
     }
-    const contentLength = Number(upstream.headers.get('content-length') || 0);
+    const contentLength = Number(getHeader(upstream.headers, 'content-length') || 0);
     if (contentLength > ICON_PROXY_MAX_BYTES) {
       return res.status(413).json({ error: 'too large' });
     }
-    const buf = await readLimitedResponse(upstream);
     res.set('Content-Type', contentType);
     res.set('Cache-Control', 'public, max-age=2592000, immutable');
     res.set('Access-Control-Allow-Origin', '*');
-    return res.send(buf);
+    return res.send(upstream.body);
   } catch (error) {
     failedTargets.set(target, Date.now());
     console.error(`[Icon Proxy] ${target} -> ${error.message}`);

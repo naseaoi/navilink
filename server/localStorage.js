@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
-import { fetchWebDavJson, putWebDavJson, putWebDavJsonBatch } from '../api/_shared/webdav.js';
+import { fetchWebDavJson, fetchWebDavJsonWithMeta, putWebDavJson, putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { getUpdatedAt, withTimestamp } from '../api/_shared/data.js';
 
 export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, defaultPrivateData }) => {
@@ -135,9 +135,21 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     const payloads = entries.map(({ fileName, data }) => ({ fileName, data: withTimestamp(fileName, data) }));
     if (mode === 'webdav') {
       const originals = Object.fromEntries(await Promise.all(
-        payloads.map(async ({ fileName }) => [fileName, await readDataFromStorage(mode, fileName)])
+        payloads.map(async ({ fileName }) => {
+          const original = await fetchWebDavJsonWithMeta(fileName);
+          return [fileName, original];
+        })
       ));
-      await putWebDavJsonBatch({ entries: payloads, originals });
+      await putWebDavJsonBatch({
+        entries: payloads.map((payload) => ({
+          ...payload,
+          ifMatch: originals[payload.fileName].etag,
+          ifNoneMatch: originals[payload.fileName].data == null
+        })),
+        originals: Object.fromEntries(
+          Object.entries(originals).map(([fileName, original]) => [fileName, original.data])
+        )
+      });
     } else {
       await writeLocalJsonBatchAtomic(payloads.map(({ fileName, data }) => ({
         filePath: path.join(dataDir, fileName),

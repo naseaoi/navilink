@@ -114,4 +114,38 @@ describe('webdav proxy', () => {
     assert.match(calls[2][0], /public\.json$/);
     assert.equal(calls[2][1].method, 'DELETE');
   });
+
+  it('uses conditional headers for batch writes', async () => {
+    const calls = [];
+    global.fetch = async (...args) => {
+      calls.push(args);
+      return { status: 204, ok: true };
+    };
+
+    await putWebDavJsonBatch({
+      entries: [
+        { fileName: 'public.json', data: { ok: true }, ifMatch: '"etag-public"' },
+        { fileName: 'private.json', data: { ok: true }, ifNoneMatch: true }
+      ],
+      env
+    });
+
+    assert.equal(calls[0][1].headers['If-Match'], '"etag-public"');
+    assert.equal(calls[1][1].headers['If-None-Match'], '*');
+  });
+
+  it('maps WebDAV precondition failures to save conflicts', async () => {
+    global.fetch = async () => ({ status: 412, ok: false });
+
+    await assert.rejects(async () => {
+      await putWebDavJsonBatch({
+        entries: [{ fileName: 'public.json', data: { ok: true }, ifMatch: '"stale"' }],
+        env
+      });
+    }, (error) => {
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.code, 'VERSION_CONFLICT');
+      return true;
+    });
+  });
 });

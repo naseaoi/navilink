@@ -17,10 +17,12 @@
 - 登录态已改为 HttpOnly Cookie，前端不再保存 token。
 - 后台保存改为 `POST /api/storage/save` 批量保存 public/private 数据。
 - 保存时基于 `_meta.updatedAt` 做冲突检测，冲突返回 `409`。
+- WebDAV 保存已结合 ETag 条件写，`412 Precondition Failed` 会转换为保存冲突。
 - 批量保存已加强一致性：本地使用临时文件和备份回滚，WebDAV 写失败时回滚已提交文件。
 - `server.js` 已拆分出认证、存储、本地读写、图标代理模块。
 - Express 与 Vercel 登录流程已统一到共享登录服务。
-- 图标代理增加限流、失败缓存，只接受 `image/*`。
+- Cookie 支持 `COOKIE_SAMESITE`、`COOKIE_DOMAIN`、`COOKIE_SECURE` 配置。
+- 图标代理增加限流、失败缓存，只接受 `image/*`，并使用固定 DNS 解析结果发起请求。
 - 已加入 ESLint、Node 内置单元测试、Playwright E2E、GitHub Actions。
 
 ## 关键文件
@@ -92,18 +94,11 @@ npm start
 - 前端仍保留少量 localStorage 标记，用于保存登录过期时间和默认密码提示状态；认证凭据已不再放 localStorage。
 - `getAuthToken` 仍兼容 Bearer token，方便旧客户端或调试调用。
 - `CORS_ORIGINS` 生产环境建议显式配置。
+- 如后台跨站部署，配置 `COOKIE_SAMESITE=None` 时 Cookie 会自动带 `Secure`。
 
 ## 建议后续优化
 
-1. **WebDAV 冲突检测增强**
-
-   当前基于 `_meta.updatedAt`。后续可结合 WebDAV ETag / If-Match，提高多端并发编辑准确性。
-
-2. **Cookie 安全策略可配置**
-
-   当前 Cookie 使用 `HttpOnly; SameSite=Lax`，生产或 Vercel 下加 `Secure`。如未来跨域部署后台，可增加 `COOKIE_SAMESITE`、`COOKIE_DOMAIN` 配置。
-
-3. **完善 E2E 覆盖**
+1. **完善 E2E 覆盖**
 
    当前覆盖登录、改密码、新增卡片、搜索、退出。建议继续补：
 
@@ -113,11 +108,7 @@ npm start
    - 保存冲突提示
    - 移动端后台菜单
 
-4. **图标代理更强 SSRF 防护**
-
-   当前已做 DNS 内网拦截和重定向检查。后续可改为连接前后绑定解析 IP，降低 DNS rebinding 风险。
-
-5. **前端状态管理拆分**
+2. **前端状态管理拆分**
 
    `AdminDashboard.tsx` 仍承担较多状态编排。建议拆出：
 
@@ -126,7 +117,7 @@ npm start
    - `useToasts`
    - `useConfirmDialog`
 
-6. **README 同步**
+3. **README 同步**
 
    README 需要更新以下内容：
 
@@ -135,6 +126,6 @@ npm start
    - E2E 测试命令
    - 新增的 `server/` 模块结构
 
-7. **发布流程补齐**
+4. **发布流程补齐**
 
    如果要发新版，更新 `package.json` version 和 `docs/release.md`，并检查 `.github/workflows` 是否符合实际发布策略。
