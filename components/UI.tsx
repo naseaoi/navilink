@@ -180,7 +180,7 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: (id: number) => void 
   useEffect(() => {
     const timer = setTimeout(() => onRemove(toast.id), 3000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [onRemove, toast.id]);
   return (
     <div className="pointer-events-auto flex items-center gap-3 px-5 py-2.5 rounded-pill
       bg-stone-900 text-white shadow-popover animate-in slide-in-from-top-4 fade-in duration-300

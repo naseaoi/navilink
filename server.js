@@ -6,8 +6,6 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { lookup } from 'dns/promises';
-import net from 'net';
 import {
   DEFAULT_ADMIN_PASSWORD,
   createDefaultPrivateData,
@@ -20,12 +18,13 @@ import {
 import { createLoginRateLimiter } from './api/_shared/rateLimit.js';
 import { getRequestedDataFile, getUpdatedAt, withTimestamp } from './api/_shared/data.js';
 import {
-  buildWebDavUrls,
   fetchWebDavJson,
-  getWebDavAuthHeader,
   hasWebDavConfig,
   putWebDavJson
 } from './api/_shared/webdav.js';
+import { proxyWebDavDataFile } from './api/_shared/webdavProxy.js';
+import { validateDataFilePayload, validateLoginPayload } from './api/_shared/validation.js';
+import { createIconProxyHandler } from './server/iconProxy.js';
 
 // 配置环境
 const __filename = fileURLToPath(import.meta.url);
@@ -43,9 +42,6 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || '')
   .filter(Boolean);
 const LOGIN_WINDOW_MS = Number(process.env.LOGIN_WINDOW_MS || 60_000);
 const LOGIN_MAX_ATTEMPTS = Number(process.env.LOGIN_MAX_ATTEMPTS || 5);
-const ICON_PROXY_MAX_BYTES = 5 * 1024 * 1024;
-const ICON_PROXY_TIMEOUT_MS = 10_000;
-const ICON_PROXY_MAX_REDIRECTS = 3;
 
 // WebDAV 配置 (如果存在则优先使用代理模式)
 const USE_WEBDAV = hasWebDavConfig();
@@ -186,94 +182,21 @@ const writeDataToStorage = async (mode, fileName, data) => {
   memoryCache[fileName] = payload;
 };
 
-const isBlockedIpv4 = (address) => {
-  const parts = address.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) return true;
-  const [a, b] = parts;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    a === 169 && b === 254 ||
-    a === 172 && b >= 16 && b <= 31 ||
-    a === 192 && b === 168 ||
-    a === 100 && b >= 64 && b <= 127 ||
-    a === 192 && b === 0 ||
-    a === 198 && (b === 18 || b === 19) ||
-    a >= 224
-  );
-};
-
-const isBlockedIp = (address) => {
-  if (address.startsWith('::ffff:')) return isBlockedIpv4(address.slice('::ffff:'.length));
-  const family = net.isIP(address);
-  if (family === 4) return isBlockedIpv4(address);
-  if (family === 6) {
-    const lower = address.toLowerCase();
-    return (
-      lower === '::1' ||
-      lower === '::' ||
-      lower.startsWith('fc') ||
-      lower.startsWith('fd') ||
-      lower.startsWith('fe80:')
-    );
+const sendValidationError = (res, error) => {
+  if (error?.statusCode === 400) {
+    return res.status(400).json({ error: error.message });
   }
-  return true;
-};
-
-const assertSafeProxyUrl = async (targetUrl) => {
-  if (!/^https?:$/.test(targetUrl.protocol)) {
-    throw new Error('unsupported protocol');
-  }
-  const records = await lookup(targetUrl.hostname, { all: true, verbatim: true });
-  if (!records.length || records.some((record) => isBlockedIp(record.address))) {
-    throw new Error('blocked host');
-  }
-};
-
-const fetchIconWithRedirects = async (targetUrl, redirectsLeft) => {
-  await assertSafeProxyUrl(targetUrl);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ICON_PROXY_TIMEOUT_MS);
-  try {
-    const response = await fetch(targetUrl.toString(), {
-      method: 'GET',
-      redirect: 'manual',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'NaviLink-IconProxy/1.0',
-        'Accept': 'image/*,*/*;q=0.8'
-      }
-    });
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-      if (redirectsLeft <= 0) throw new Error('too many redirects');
-      const location = response.headers.get('location');
-      if (!location) throw new Error('missing redirect location');
-      return fetchIconWithRedirects(new URL(location, targetUrl), redirectsLeft - 1);
-    }
-    return response;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
-const readLimitedResponse = async (response) => {
-  const chunks = [];
-  let total = 0;
-  for await (const chunk of response.body) {
-    total += chunk.length;
-    if (total > ICON_PROXY_MAX_BYTES) {
-      throw new Error('too large');
-    }
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
+  throw error;
 };
 
 // --- API 处理逻辑 ---
 
 // 统一的 API 入口
 app.all('/api/webdav', async (req, res) => {
+  if (!['GET', 'PUT'].includes(req.method)) {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   const fileName = getRequestedDataFile(req.query.file);
   if (!fileName) {
     return res.status(400).json({ error: 'Invalid file parameter' });
@@ -286,11 +209,14 @@ app.all('/api/webdav', async (req, res) => {
     if (!payload) return;
   }
 
-  if (isWrite && isPrivate) {
-    req.body = normalizePrivateData(req.body);
-  }
-  if (isWrite && (fileName === 'public.json' || fileName === 'private.json')) {
-    req.body = withTimestamp(fileName, req.body);
+  if (isWrite) {
+    try {
+      req.body = validateDataFilePayload(fileName, req.body);
+      if (isPrivate) req.body = normalizePrivateData(req.body);
+      req.body = withTimestamp(fileName, req.body);
+    } catch (error) {
+      return sendValidationError(res, error);
+    }
   }
 
   const storageMode = await getStorageMode();
@@ -347,8 +273,13 @@ async function handleLocalStorage(req, res, fileName) {
 
 // --- Auth Routes ---
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password, remember } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+  let loginPayload;
+  try {
+    loginPayload = validateLoginPayload(req.body);
+  } catch (error) {
+    return sendValidationError(res, error);
+  }
+  const { username, password, remember } = loginPayload;
   const rateKey = loginRateLimiter.getKey(req, username);
   const rateState = loginRateLimiter.getState(rateKey);
   if (rateState.limited) {
@@ -481,94 +412,18 @@ app.post('/api/storage/sync', async (req, res) => {
   }
 });
 
-// 处理 WebDAV 代理 (与 Vercel 逻辑保持一致)
 async function handleWebDAVProxy(req, res, fileName) {
-  const { targetUrl, dirUrl } = buildWebDavUrls(fileName);
-  const authHeader = getWebDavAuthHeader();
-
   try {
-    const fetchOptions = {
-      method: req.method,
-      headers: { 'Authorization': authHeader }
-    };
-
-    if (req.method === 'PUT') {
-      fetchOptions.body = JSON.stringify(req.body);
-      fetchOptions.headers['Content-Type'] = 'application/json';
-    }
-
-    const response = await fetch(targetUrl, fetchOptions);
-
-    // 处理 404 (初始化)
-    if (response.status === 404 && req.method === 'GET') {
-      return res.status(404).json({ error: 'File not found' });
-    }
-    
-    // 处理 409 (文件夹不存在)
-    if (response.status === 409 && req.method === 'PUT') {
-       // 尝试创建目录
-       await fetch(dirUrl, { method: 'MKCOL', headers: { 'Authorization': authHeader } });
-       // 重试保存
-       const retryRes = await fetch(targetUrl, fetchOptions);
-       if (retryRes.ok) return res.json({ success: true });
-    }
-
-    if (!response.ok) {
-      return res.status(response.status).send(await response.text());
-    }
-
-    if (req.method === 'GET') {
-      const data = await response.json();
-      return res.json(data);
-    } else {
-      return res.json({ success: true });
-    }
+    const result = await proxyWebDavDataFile({ method: req.method, fileName, body: req.body });
+    if (result.json) return res.status(result.status).json(result.body);
+    return res.status(result.status).send(result.body);
   } catch (error) {
     console.error(`[WebDAV Proxy Error] ${error.message}`);
     res.status(500).json({ error: 'Proxy Error' });
   }
 }
 
-app.get('/api/icon-proxy', async (req, res) => {
-  const target = String(req.query.url || '').trim();
-  if (!target) return res.status(400).json({ error: 'missing url' });
-
-  let parsed;
-  try {
-    parsed = new URL(target);
-  } catch {
-    return res.status(400).json({ error: 'invalid url' });
-  }
-
-  try {
-    const upstream = await fetchIconWithRedirects(parsed, ICON_PROXY_MAX_REDIRECTS);
-    if (!upstream.ok) {
-      return res.status(502).json({ error: `upstream ${upstream.status}` });
-    }
-    const contentType = upstream.headers.get('content-type') || 'image/png';
-    if (!/^image\//i.test(contentType) && !/octet-stream/i.test(contentType)) {
-      return res.status(415).json({ error: 'not an image' });
-    }
-    const contentLength = Number(upstream.headers.get('content-length') || 0);
-    if (contentLength > ICON_PROXY_MAX_BYTES) {
-      return res.status(413).json({ error: 'too large' });
-    }
-    const buf = await readLimitedResponse(upstream);
-    res.set('Content-Type', contentType);
-    res.set('Cache-Control', 'public, max-age=2592000, immutable');
-    res.set('Access-Control-Allow-Origin', '*');
-    return res.send(buf);
-  } catch (error) {
-    console.error(`[Icon Proxy] ${target} -> ${error.message}`);
-    if (error.message === 'blocked host' || error.message === 'unsupported protocol') {
-      return res.status(400).json({ error: error.message });
-    }
-    if (error.message === 'too large') {
-      return res.status(413).json({ error: 'too large' });
-    }
-    return res.status(502).json({ error: 'fetch failed' });
-  }
-});
+app.get('/api/icon-proxy', createIconProxyHandler());
 
 // 所有其他路由返回 index.html (SPA 支持)
 app.get('*', (req, res) => {

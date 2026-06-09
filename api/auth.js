@@ -9,6 +9,7 @@ import {
 import { createLoginRateLimiter } from './_shared/rateLimit.js';
 import { withTimestamp } from './_shared/data.js';
 import { fetchWebDavJson, getWebDavEnv, hasWebDavConfig, putWebDavJson } from './_shared/webdav.js';
+import { validateLoginPayload } from './_shared/validation.js';
 
 const loginRateLimiter = createLoginRateLimiter();
 
@@ -29,8 +30,13 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { username, password, remember } = request.body || {};
-  if (!username || !password) return response.status(400).json({ error: 'Missing credentials' });
+  let loginPayload;
+  try {
+    loginPayload = validateLoginPayload(request.body);
+  } catch (error) {
+    return response.status(400).json({ error: error.message });
+  }
+  const { username, password, remember } = loginPayload;
   const rateKey = loginRateLimiter.getKey(request, username);
   const rateState = loginRateLimiter.getState(rateKey);
   if (rateState.limited) {

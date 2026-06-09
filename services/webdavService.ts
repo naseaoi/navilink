@@ -40,6 +40,12 @@ const DEFAULT_PRIVATE_DATA: PrivateData = {
 };
 
 class WebDavService {
+  private publicDataSource: 'api' | 'localStorage' | 'default' = 'api';
+
+  getPublicDataSource(): 'api' | 'localStorage' | 'default' {
+    return this.publicDataSource;
+  }
+
   private getAuthToken(): string | null {
     return localStorage.getItem('navilink_token');
   }
@@ -103,6 +109,7 @@ class WebDavService {
       if (response.status === 404) {
         // Init file if not exists
         await this.savePublicData(DEFAULT_PUBLIC_DATA);
+        this.publicDataSource = 'default';
         return DEFAULT_PUBLIC_DATA;
       }
       
@@ -110,15 +117,24 @@ class WebDavService {
         // If API fails (e.g. local dev without API), fallback to LocalStorage Mock
         console.warn("API unavailable, falling back to local storage");
         const stored = localStorage.getItem('navilink_public');
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+          this.publicDataSource = 'localStorage';
+          return JSON.parse(stored);
+        }
+        this.publicDataSource = 'default';
         return DEFAULT_PUBLIC_DATA;
       }
       
+      this.publicDataSource = 'api';
       return await response.json();
     } catch (e) {
       console.error("Fetch Error:", e);
       const stored = localStorage.getItem('navilink_public');
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        this.publicDataSource = 'localStorage';
+        return JSON.parse(stored);
+      }
+      this.publicDataSource = 'default';
       return DEFAULT_PUBLIC_DATA;
     }
   }

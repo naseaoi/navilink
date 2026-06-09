@@ -1,9 +1,15 @@
 import { getAuthPayload, normalizePrivateData } from './_shared/auth.js';
 import { getRequestedDataFile, withTimestamp } from './_shared/data.js';
-import { buildWebDavUrls, getWebDavAuthHeader, hasWebDavConfig } from './_shared/webdav.js';
+import { hasWebDavConfig } from './_shared/webdav.js';
+import { proxyWebDavDataFile } from './_shared/webdavProxy.js';
+import { validateDataFilePayload } from './_shared/validation.js';
 
 export default async function handler(request, response) {
   const { AUTH_SECRET } = process.env;
+
+  if (!['GET', 'PUT'].includes(request.method)) {
+    return response.status(405).json({ error: 'Method not allowed' });
+  }
 
   if (!hasWebDavConfig()) {
     return response.status(500).json({ error: 'WebDAV environment variables are missing on Vercel.' });
@@ -24,61 +30,24 @@ export default async function handler(request, response) {
     if (!payload) return response.status(401).json({ error: 'Unauthorized' });
   }
   
-  const { targetUrl, dirUrl } = buildWebDavUrls(fileName);
-
-  console.log(`[WebDAV Proxy] Method: ${request.method}, Target: ${targetUrl}`);
-
   const method = request.method;
-  const authHeader = getWebDavAuthHeader();
 
   try {
-    const fetchOptions = {
-      method: method,
-      headers: {
-        'Authorization': authHeader,
-      }
-    };
-
+    let body;
     if (method === 'PUT') {
-      const bodyData = isPrivate ? normalizePrivateData(request.body) : request.body;
-      const stamped = withTimestamp(fileName, bodyData);
-      fetchOptions.body = JSON.stringify(stamped);
-      fetchOptions.headers['Content-Type'] = 'application/json';
+      const validated = validateDataFilePayload(fileName, request.body);
+      const bodyData = isPrivate ? normalizePrivateData(validated) : validated;
+      body = withTimestamp(fileName, bodyData);
     }
 
-    let davResponse = await fetch(targetUrl, fetchOptions);
-
-    if (davResponse.status === 409 && method === 'PUT') {
-      console.log(`[WebDAV Proxy] Got 409, attempting to create directory: ${dirUrl}`);
-      const mkcolResponse = await fetch(dirUrl, {
-        method: 'MKCOL',
-        headers: { 'Authorization': authHeader }
-      });
-      
-      if (mkcolResponse.ok || mkcolResponse.status === 405) {
-        console.log(`[WebDAV Proxy] Directory created or exists, retrying PUT...`);
-        davResponse = await fetch(targetUrl, fetchOptions);
-      }
-    }
-
-    if (davResponse.status === 404 && method === 'GET') {
-      return response.status(404).json({ error: 'File not found' });
-    }
-
-    if (!davResponse.ok) {
-      const errorText = await davResponse.text();
-      console.error(`[WebDAV Proxy] Upstream error (${davResponse.status}):`, errorText);
-      return response.status(davResponse.status).send(errorText || `Upstream WebDAV error ${davResponse.status}`);
-    }
-
-    if (method === 'GET') {
-      const data = await davResponse.json();
-      return response.status(200).json(data);
-    } else {
-      return response.status(200).json({ success: true });
-    }
+    const result = await proxyWebDavDataFile({ method, fileName, body });
+    if (result.json) return response.status(result.status).json(result.body);
+    return response.status(result.status).send(result.body);
 
   } catch (error) {
+    if (error?.statusCode === 400) {
+      return response.status(400).json({ error: error.message });
+    }
     console.error('[WebDAV Proxy] Exception:', error);
     return response.status(500).json({ error: 'Server proxy error', message: error.message });
   }

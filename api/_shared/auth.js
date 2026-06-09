@@ -12,18 +12,23 @@ export const signToken = (payload, secret) => {
 };
 
 export const verifyToken = (token, secret) => {
-  if (!token || !secret) return null;
-  const [body, sig] = token.split('.');
-  if (!body || !sig) return null;
-  const expected = crypto.createHmac('sha256', secret).update(body).digest('base64url');
-  const sigBuf = Buffer.from(sig);
-  const expBuf = Buffer.from(expected);
-  if (sigBuf.length !== expBuf.length) return null;
-  const valid = crypto.timingSafeEqual(sigBuf, expBuf);
-  if (!valid) return null;
-  const payload = JSON.parse(base64UrlDecode(body));
-  if (payload.exp && Date.now() > payload.exp) return null;
-  return payload;
+  try {
+    if (!token || !secret) return null;
+    const [body, sig] = token.split('.');
+    if (!body || !sig) return null;
+    const expected = crypto.createHmac('sha256', secret).update(body).digest('base64url');
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expected);
+    if (sigBuf.length !== expBuf.length) return null;
+    const valid = crypto.timingSafeEqual(sigBuf, expBuf);
+    if (!valid) return null;
+    const payload = JSON.parse(base64UrlDecode(body));
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload.exp && Date.now() > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 };
 
 export const hashPassword = (password) => {
@@ -38,6 +43,7 @@ export const verifyPassword = (password, stored) => {
   const [, salt, hash] = stored.split('$');
   if (!salt || !hash) return false;
   const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  if (hash.length !== derived.length) return false;
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(derived));
 };
 

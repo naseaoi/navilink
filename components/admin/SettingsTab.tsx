@@ -6,11 +6,13 @@ import { PublicData, PrivateData } from '../../types';
 interface SettingsTabProps {
   dataP: PublicData;
   dataV: PrivateData;
+  newPassword: string;
   onP: (data: PublicData) => void;
   onV: (data: PrivateData) => void;
+  onNewPasswordChange: (value: string) => void;
 }
 
-export const SettingsTab: React.FC<SettingsTabProps> = ({ dataP, dataV, onP, onV }) => (
+export const SettingsTab: React.FC<SettingsTabProps> = ({ dataP, dataV, newPassword, onP, onV, onNewPasswordChange }) => (
   <div className="grid gap-8 lg:grid-cols-2">
     <Card className="p-8 space-y-6">
       <h3 className="text-lg font-semibold flex items-center gap-2 text-1"><Layout size={18}/> 基础信息</h3>
@@ -21,7 +23,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ dataP, dataV, onP, onV
     <Card className="p-8 space-y-6">
       <h3 className="text-lg font-semibold flex items-center gap-2 text-1"><Shield size={18}/> 管理账号</h3>
       <Input label="管理员账号" value={dataV.admin.username} onChange={e=>onV({ ...dataV, admin: { ...dataV.admin, username: e.target.value } })} />
-      <PasswordInput label="重置密码" placeholder="输入新密码..." onChange={e=>onV({ ...dataV, admin: { ...dataV.admin, passwordHash: e.target.value } })} />
+      <PasswordInput label="重置密码" placeholder="输入新密码..." value={newPassword} onChange={e=>onNewPasswordChange(e.target.value)} />
     </Card>
   </div>
 );

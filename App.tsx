@@ -34,7 +34,9 @@ const MainApp = () => {
     const init = async () => {
       try {
         const pub = await webdav.fetchPublicData();
-        setState(prev => ({ ...prev, publicData: pub, hasFetchedPublicData: true }));
+        const source = webdav.getPublicDataSource();
+        const error = source === 'api' ? null : source === 'localStorage' ? '正在使用本地缓存' : '正在使用默认数据';
+        setState(prev => ({ ...prev, publicData: pub, hasFetchedPublicData: true, error }));
       } catch (e) {
         setState(prev => ({ ...prev, hasFetchedPublicData: true, error: '无法同步远程数据' }));
       }
@@ -72,7 +74,7 @@ const MainApp = () => {
 
   return (
     <Routes>
-      <Route element={<PublicView data={state.publicData} hasFetchedData={state.hasFetchedPublicData} theme={theme} onToggleTheme={toggleTheme} />}>
+      <Route element={<PublicView data={state.publicData} hasFetchedData={state.hasFetchedPublicData} dataStatus={state.error} theme={theme} onToggleTheme={toggleTheme} />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/c/:categoryId" element={<CategoryPage />} />
       </Route>

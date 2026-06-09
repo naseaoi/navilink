@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { LinkCard } from '../../types';
 import { CachedIcon } from './CachedIcon';
-import { usePublicOutlet } from '../PublicView';
+import { usePublicOutlet } from './publicOutlet';
 import { getCategoryIcon, sortCategories } from './categoryIcons';
 
 export const CategoryPage: React.FC = () => {

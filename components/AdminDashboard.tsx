@@ -10,6 +10,7 @@ import { CategoriesTab } from './admin/CategoriesTab';
 import { StorageTab } from './admin/StorageTab';
 import { AdminSidebar } from './admin/AdminSidebar';
 import { AdminTab, getAdminTabTitle } from './admin/adminLabels';
+import { validatePrivateDataForSave, validatePublicDataForSave } from '../services/validation';
 
 interface AdminDashboardProps {
   publicData: PublicData;
@@ -27,6 +28,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   const [isSaving, setIsSaving] = useState(false);
   const [localPublic, setLocalPublic] = useState<PublicData>(publicData);
   const [localPrivate, setLocalPrivate] = useState<PrivateData>(privateData);
+  const [newPassword, setNewPassword] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [storageMode, setStorageMode] = useState<'local' | 'webdav'>('local');
@@ -47,7 +49,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   };
 
   useEffect(() => { setLocalPublic(publicData); }, [publicData]);
-  useEffect(() => { setLocalPrivate(privateData); }, [privateData]);
+  useEffect(() => { setLocalPrivate(privateData); setNewPassword(''); }, [privateData]);
 
   const hasShownPolicyToast = useRef(false);
   useEffect(() => {
@@ -97,19 +99,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   };
 
   const handleStorageModeChange = async (mode: 'local' | 'webdav') => {
-    setStorageLoading(true);
-    try {
-      const info = await webdav.setStorageMode(mode);
-      setStorageMode(info.mode);
-      setStorageAvailable(info.available);
-      await refreshRemoteData();
-      await refreshStorageStatus();
-      showToast('存储模式已切换', 'success');
-    } catch (error) {
-      showToast('切换存储模式失败', 'error');
-    } finally {
-      setStorageLoading(false);
+    const changeMode = async () => {
+      setStorageLoading(true);
+      try {
+        const info = await webdav.setStorageMode(mode);
+        setStorageMode(info.mode);
+        setStorageAvailable(info.available);
+        await refreshRemoteData();
+        await refreshStorageStatus();
+        showToast('存储模式已切换', 'success');
+      } catch (error) {
+        showToast('切换存储模式失败', 'error');
+      } finally {
+        setStorageLoading(false);
+      }
+    };
+
+    if (hasChanges) {
+      confirm('放弃未保存更改', '切换存储模式会重新加载数据。', changeMode, 'danger');
+      return;
     }
+
+    await changeMode();
   };
 
   const handleStorageSync = (from: 'local' | 'webdav', to: 'local' | 'webdav') => {
@@ -136,19 +147,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   };
 
   const handleSave = async () => {
-    if (mustChangePassword && localPrivate.admin.passwordHash === privateData.admin.passwordHash) {
-      showToast('请先修改默认密码后再保存', 'error');
+    const publicError = validatePublicDataForSave(localPublic);
+    if (publicError) {
+      showToast(publicError, 'error');
+      return;
+    }
+
+    const privateError = validatePrivateDataForSave(localPrivate, newPassword, mustChangePassword);
+    if (privateError) {
+      showToast(privateError, 'error');
       setActiveTab('settings');
       return;
     }
 
     setIsSaving(true);
     try {
+      const privatePayload = newPassword.trim()
+        ? { ...localPrivate, admin: { ...localPrivate.admin, passwordHash: newPassword.trim() } }
+        : localPrivate;
       await webdav.savePublicData(localPublic);
-      await webdav.savePrivateData(localPrivate);
+      await webdav.savePrivateData(privatePayload);
+      const savedPrivate = await webdav.fetchPrivateData();
       onUpdatePublic(localPublic);
-      onUpdatePrivate(localPrivate);
+      setLocalPrivate(savedPrivate);
+      onUpdatePrivate(savedPrivate);
       if (mustChangePassword) onPasswordPolicyResolved();
+      setNewPassword('');
       setHasChanges(false);
       await refreshStorageStatus();
       showToast('设置保存成功', 'success');
@@ -231,8 +255,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
                 <SettingsTab 
                   dataP={localPublic} 
                   dataV={localPrivate} 
+                  newPassword={newPassword}
                   onP={d=>{setLocalPublic(d); markChanged();}} 
                   onV={d=>{setLocalPrivate(d); markChanged();}}
+                  onNewPasswordChange={value=>{setNewPassword(value); markChanged();}}
                 />
               )}
               {activeTab === 'cards' && <CardsTab data={localPublic} onChange={d=>{setLocalPublic(d); markChanged();}} confirm={confirm} />}

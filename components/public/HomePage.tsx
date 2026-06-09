@@ -1,5 +1,5 @@
 import React from 'react';
-import { usePublicOutlet } from '../PublicView';
+import { usePublicOutlet } from './publicOutlet';
 import { Hero } from './Hero';
 import { HeroSearch } from './HeroSearch';
 import { CategoryGroups } from './CategoryGroups';

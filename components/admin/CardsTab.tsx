@@ -2,26 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Edit2, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { Button, Input, Modal, Select } from '../UI';
 import { LinkCard, PublicData } from '../../types';
-
-const FALLBACK_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="#E7E5E4"/><rect x="16" y="18" width="32" height="28" rx="6" stroke="#78716C" stroke-width="3"/><circle cx="26" cy="28" r="3" fill="#78716C"/><path d="M20 42l9-9 6 6 5-5 8 8" stroke="#78716C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-)}`;
-
-const resolveIconSrc = (icon?: string) => (icon && icon.trim() ? icon : FALLBACK_ICON);
-
-const handleIconError = (event: React.SyntheticEvent<HTMLImageElement, Event>, url: string) => {
-  const target = event.currentTarget;
-  if (target.dataset.fallback === 'favicon') {
-    target.src = FALLBACK_ICON;
-    return;
-  }
-  try {
-    target.src = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`;
-    target.dataset.fallback = 'favicon';
-  } catch {
-    target.src = FALLBACK_ICON;
-  }
-};
+import { CachedIcon } from '../public/CachedIcon';
 
 interface CardsTabProps {
   data: PublicData;
@@ -36,8 +17,22 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
-  const filtered = filterCat === 'all' ? data.cards : data.cards.filter((c:any) => c.categoryId === filterCat);
+  const filtered = filterCat === 'all' ? data.cards : data.cards.filter((card) => card.categoryId === filterCat);
   const sorted = [...filtered].sort((a, b) => a.order - b.order);
+  const categoryOptions = data.categories.map((category) => ({ value: category.id, label: category.name }));
+
+  const reorderCards = (targetId?: string) => {
+    if (!draggedId) return data.cards;
+    const scope = [...sorted];
+    const fromIndex = scope.findIndex((card) => card.id === draggedId);
+    if (fromIndex === -1) return data.cards;
+    const targetIndex = targetId ? scope.findIndex((card) => card.id === targetId) : fromIndex;
+    if (targetIndex === -1) return data.cards;
+    const [moved] = scope.splice(fromIndex, 1);
+    scope.splice(targetIndex, 0, moved);
+    const orderById = new Map(scope.map((card, index) => [card.id, index]));
+    return data.cards.map((card) => orderById.has(card.id) ? { ...card, order: orderById.get(card.id)! } : card);
+  };
 
   useEffect(() => {
     const handleGlobalClick = () => setActiveMenuId(null);
@@ -50,17 +45,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   const onDragEnter = (targetId: string) => {
     if (!draggedId || draggedId === targetId) return;
 
-    const allCards = [...data.cards];
-    const draggedIdx = allCards.findIndex(c => c.id === draggedId);
-    const targetIdx = allCards.findIndex(c => c.id === targetId);
-
-    if (draggedIdx === -1 || targetIdx === -1) return;
-
-    const draggedOrder = allCards[draggedIdx].order;
-    allCards[draggedIdx].order = allCards[targetIdx].order;
-    allCards[targetIdx].order = draggedOrder;
-
-    onChange({ ...data, cards: allCards });
+    onChange({ ...data, cards: reorderCards(targetId) });
   };
 
   const handleTouchStart = (_e: React.TouchEvent, id: string) => {
@@ -83,10 +68,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   };
 
   const handleTouchEnd = () => {
-    const reindexed = [...data.cards]
-      .sort((a: LinkCard, b: LinkCard) => a.order - b.order)
-      .map((card: LinkCard, index: number) => ({ ...card, order: index }));
-    onChange({ ...data, cards: reindexed });
+    onChange({ ...data, cards: reorderCards() });
     setDraggedId(null);
   };
 
@@ -94,7 +76,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
 
   const save = () => {
     if (!editingCard.title || !editingCard.url) return;
-    let cards = [...data.cards];
+    const cards = [...data.cards];
     const idx = cards.findIndex(c => c.id === editingCard.id);
 
     if (idx >= 0) {
@@ -117,7 +99,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <Select 
-          options={[{value:'all', label:'所有卡片'}, ...data.categories.map((c:any)=>({value:c.id, label:c.name}))]} 
+          options={[{value:'all', label:'所有卡片'}, ...categoryOptions]} 
           value={filterCat} 
           onChange={setFilterCat} 
           className="w-auto min-w-[120px] max-w-[50%]" 
@@ -153,12 +135,10 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
             </div>
 
             <div className="w-10 h-10 shrink-0 bg-subtle rounded-control flex items-center justify-center border border-subtle overflow-hidden group-hover:scale-105 transition-transform duration-300">
-              <img 
-                src={resolveIconSrc(card.icon)} 
+              <CachedIcon
+                icon={card.icon}
+                siteUrl={card.url}
                 className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" 
-                loading="lazy"
-                decoding="async"
-                onError={(e) => handleIconError(e, card.url)}
                 alt={card.title}
               />
             </div>
@@ -197,7 +177,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
           <Input label="目标 URL" value={editingCard.url||''} onChange={e=>setEditingCard({...editingCard, url:e.target.value})} />
           <div className="grid grid-cols-2 gap-4">
             <Input label="图标 (可选)" placeholder="留空自动获取" value={editingCard.icon||''} onChange={e=>setEditingCard({...editingCard, icon:e.target.value})} />
-            <Select label="所属分类" value={editingCard.categoryId||''} onChange={v=>setEditingCard({...editingCard, categoryId:v})} options={data.categories.map((c:any)=>({value:c.id, label:c.name}))} />
+            <Select label="所属分类" value={editingCard.categoryId||''} onChange={v=>setEditingCard({...editingCard, categoryId:v})} options={categoryOptions} />
           </div>
           <div className="space-y-2">
             <label className="block text-sm font-medium text-2">描述</label>

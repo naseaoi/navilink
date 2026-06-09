@@ -11,13 +11,28 @@ interface AdminSidebarProps {
   onCloseMobileMenu?: () => void;
 }
 
-const NavButton = ({ active, onClick, icon, label, disabled = false }: any) => (
+interface SidebarButtonProps {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}
+
+interface NavButtonProps extends SidebarButtonProps {
+  active: boolean;
+  disabled?: boolean;
+}
+
+interface FooterButtonProps extends SidebarButtonProps {
+  tone?: 'default' | 'danger';
+}
+
+const NavButton = ({ active, onClick, icon, label, disabled = false }: NavButtonProps) => (
   <button disabled={disabled} onClick={onClick} className={`w-full flex items-center gap-4 px-4 py-3 rounded-control text-sm font-medium transition-all border ${active ? 'bg-subtle text-1 border-default shadow-soft' : 'text-2 border-transparent hover:text-1 hover:bg-subtle hover:border-subtle'} ${disabled ? 'opacity-40 cursor-not-allowed hover:text-2 hover:bg-transparent hover:border-transparent' : ''}`}>
     {icon}{label}
   </button>
 );
 
-const FooterButton = ({ onClick, icon, label, tone = 'default' }: any) => (
+const FooterButton = ({ onClick, icon, label, tone = 'default' }: FooterButtonProps) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center gap-4 px-4 py-3 rounded-control text-sm font-medium transition-all border border-transparent ${

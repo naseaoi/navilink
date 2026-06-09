@@ -1,29 +1,22 @@
 import React, { useDeferredValue, useState, useMemo, useEffect, useRef } from 'react';
-import { Outlet, useNavigate, useOutletContext } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { PublicData, LinkCard } from '../types';
 import { ArrowUpRight } from 'lucide-react';
 import { Modal, Button } from './UI';
 import { Sidebar, MobileBar } from './public/Sidebar';
 import { SearchOverlay } from './public/SearchOverlay';
 import { CachedIcon } from './public/CachedIcon';
+import { PublicOutletContext } from './public/publicOutlet';
 
 interface PublicViewProps {
   data: PublicData;
   hasFetchedData: boolean;
+  dataStatus?: string | null;
   theme?: 'light' | 'dark' | 'system';
   onToggleTheme?: () => void;
 }
 
-export interface PublicOutletContext {
-  data: PublicData;
-  hasFetchedData: boolean;
-  onCardClick: (card: LinkCard) => void;
-  onSearchOpen: () => void;
-}
-
-export const usePublicOutlet = () => useOutletContext<PublicOutletContext>();
-
-export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, theme = 'system', onToggleTheme }) => {
+export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, dataStatus, theme = 'system', onToggleTheme }) => {
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,6 +98,11 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, th
         <MobileBar theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} onSearchOpen={() => setIsSearchOpen(true)} />
 
         <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-8 md:px-12 md:py-20">
+          {dataStatus && (
+            <div className="mb-4 w-fit rounded-control border border-amber-200 bg-amber-50 px-3 py-1.5 text-[12px] font-medium text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-300">
+              {dataStatus}
+            </div>
+          )}
           <Outlet context={outletContext} />
         </main>
       </div>
