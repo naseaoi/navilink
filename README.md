@@ -65,10 +65,7 @@ npm run lint
 npm run test
 npm run typecheck
 npm run build
-npm run test:e2e
 ```
-
-`npm run test:e2e` 会先构建生产产物，再启动本地服务执行 Playwright 用例。
 
 ## 部署
 
