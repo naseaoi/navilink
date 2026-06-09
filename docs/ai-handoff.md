@@ -17,7 +17,9 @@
 - 登录态已改为 HttpOnly Cookie，前端不再保存 token。
 - 后台保存改为 `POST /api/storage/save` 批量保存 public/private 数据。
 - 保存时基于 `_meta.updatedAt` 做冲突检测，冲突返回 `409`。
+- 批量保存已加强一致性：本地使用临时文件和备份回滚，WebDAV 写失败时回滚已提交文件。
 - `server.js` 已拆分出认证、存储、本地读写、图标代理模块。
+- Express 与 Vercel 登录流程已统一到共享登录服务。
 - 图标代理增加限流、失败缓存，只接受 `image/*`。
 - 已加入 ESLint、Node 内置单元测试、Playwright E2E、GitHub Actions。
 
@@ -29,6 +31,7 @@
 - `server/localStorage.js`：本地 JSON 读写、存储模式、状态查询。
 - `server/iconProxy.js`：图标代理、SSRF 拦截、限流、失败缓存。
 - `api/_shared/auth.js`：Token、Cookie、密码 hash 共享逻辑。
+- `api/_shared/authService.js`：共享登录流程，负责限流、账号校验、密码升级、Cookie 签发。
 - `api/_shared/validation.js`：后端运行时数据校验。
 - `api/_shared/saveData.js`：批量保存前的数据校验和版本冲突检测。
 - `api/storage/save.js`：Vercel 批量保存入口。
@@ -92,23 +95,15 @@ npm start
 
 ## 建议后续优化
 
-1. **统一 Express 与 Vercel 认证实现**
-
-   当前 Express 已拆成 `server/authRoutes.js`，Vercel 仍在 `api/auth.js` 内保留独立流程。建议继续抽出共享登录服务，两个入口只负责 request/response 适配。
-
-2. **批量保存的事务性加强**
-
-   当前批量保存先写 `public.json` 再写 `private.json`。如第二步失败，仍可能出现半保存。建议实现临时文件/备份回滚，或 WebDAV 端用 staging 文件加提交标记。
-
-3. **WebDAV 冲突检测增强**
+1. **WebDAV 冲突检测增强**
 
    当前基于 `_meta.updatedAt`。后续可结合 WebDAV ETag / If-Match，提高多端并发编辑准确性。
 
-4. **Cookie 安全策略可配置**
+2. **Cookie 安全策略可配置**
 
    当前 Cookie 使用 `HttpOnly; SameSite=Lax`，生产或 Vercel 下加 `Secure`。如未来跨域部署后台，可增加 `COOKIE_SAMESITE`、`COOKIE_DOMAIN` 配置。
 
-5. **完善 E2E 覆盖**
+3. **完善 E2E 覆盖**
 
    当前覆盖登录、改密码、新增卡片、搜索、退出。建议继续补：
 
@@ -118,11 +113,11 @@ npm start
    - 保存冲突提示
    - 移动端后台菜单
 
-6. **图标代理更强 SSRF 防护**
+4. **图标代理更强 SSRF 防护**
 
    当前已做 DNS 内网拦截和重定向检查。后续可改为连接前后绑定解析 IP，降低 DNS rebinding 风险。
 
-7. **前端状态管理拆分**
+5. **前端状态管理拆分**
 
    `AdminDashboard.tsx` 仍承担较多状态编排。建议拆出：
 
@@ -131,7 +126,7 @@ npm start
    - `useToasts`
    - `useConfirmDialog`
 
-8. **README 同步**
+6. **README 同步**
 
    README 需要更新以下内容：
 
@@ -140,6 +135,6 @@ npm start
    - E2E 测试命令
    - 新增的 `server/` 模块结构
 
-9. **发布流程补齐**
+7. **发布流程补齐**
 
    如果要发新版，更新 `package.json` version 和 `docs/release.md`，并检查 `.github/workflows` 是否符合实际发布策略。

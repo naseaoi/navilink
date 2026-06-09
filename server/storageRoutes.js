@@ -65,9 +65,11 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
         privateData: req.body?.privateData,
         expected: req.body?.expected
       });
-      const savedPublic = await storage.writeCurrentData('public.json', prepared.publicData);
-      const savedPrivate = await storage.writeCurrentData('private.json', prepared.privateData);
-      return res.json({ publicData: savedPublic, privateData: savedPrivate });
+      const saved = await storage.writeCurrentDataBatch([
+        { fileName: 'public.json', data: prepared.publicData },
+        { fileName: 'private.json', data: prepared.privateData }
+      ]);
+      return res.json({ publicData: saved['public.json'], privateData: saved['private.json'] });
     } catch (error) {
       return sendValidationError(res, error);
     }

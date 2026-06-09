@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
-import { fetchWebDavJson, putWebDavJson } from '../api/_shared/webdav.js';
+import { fetchWebDavJson, putWebDavJson, putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { getUpdatedAt, withTimestamp } from '../api/_shared/data.js';
 
 export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, defaultPrivateData }) => {
@@ -30,6 +30,58 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(tempPath, JSON.stringify(data, null, 2));
     await fs.rename(tempPath, filePath);
+  };
+
+  const restoreLocalBackup = async ({ filePath, backupPath, hadOriginal }) => {
+    if (hadOriginal) {
+      await fs.rename(backupPath, filePath);
+      return;
+    }
+    await fs.rm(filePath, { force: true });
+  };
+
+  const writeLocalJsonBatchAtomic = async (items) => {
+    const txId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const prepared = items.map(({ filePath, data }) => ({
+      filePath,
+      data,
+      tempPath: `${filePath}.${txId}.tmp`,
+      backupPath: `${filePath}.${txId}.bak`,
+      hadOriginal: false,
+      committed: false
+    }));
+
+    try {
+      for (const item of prepared) {
+        await fs.mkdir(path.dirname(item.filePath), { recursive: true });
+        await fs.writeFile(item.tempPath, JSON.stringify(item.data, null, 2));
+        try {
+          await fs.copyFile(item.filePath, item.backupPath);
+          item.hadOriginal = true;
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
+      }
+
+      for (const item of prepared) {
+        await fs.rename(item.tempPath, item.filePath);
+        item.committed = true;
+      }
+    } catch (error) {
+      for (const item of prepared.filter((entry) => entry.committed).reverse()) {
+        try {
+          await restoreLocalBackup(item);
+        } catch (rollbackError) {
+          console.error(`[Storage Rollback Error] ${path.basename(item.filePath)}: ${rollbackError.message}`);
+        }
+      }
+      throw error;
+    } finally {
+      await Promise.all(prepared.flatMap((item) => [
+        fs.rm(item.tempPath, { force: true }),
+        fs.rm(item.backupPath, { force: true })
+      ]));
+    }
   };
 
   const normalizeStorageMode = (mode) => (mode === 'webdav' ? 'webdav' : 'local');
@@ -76,6 +128,26 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
   const writeCurrentData = async (fileName, data) => {
     const mode = await getStorageMode();
     return writeDataToStorage(mode, fileName, data);
+  };
+
+  const writeCurrentDataBatch = async (entries) => {
+    const mode = await getStorageMode();
+    const payloads = entries.map(({ fileName, data }) => ({ fileName, data: withTimestamp(fileName, data) }));
+    if (mode === 'webdav') {
+      const originals = Object.fromEntries(await Promise.all(
+        payloads.map(async ({ fileName }) => [fileName, await readDataFromStorage(mode, fileName)])
+      ));
+      await putWebDavJsonBatch({ entries: payloads, originals });
+    } else {
+      await writeLocalJsonBatchAtomic(payloads.map(({ fileName, data }) => ({
+        filePath: path.join(dataDir, fileName),
+        data
+      })));
+    }
+    payloads.forEach(({ fileName, data }) => {
+      memoryCache[fileName] = data;
+    });
+    return Object.fromEntries(payloads.map(({ fileName, data }) => [fileName, data]));
   };
 
   const readPrivateOrDefault = async () => {
@@ -133,6 +205,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     writeDataToStorage,
     readCurrentData,
     writeCurrentData,
+    writeCurrentDataBatch,
     readPrivateOrDefault,
     readStatus,
     handleLocalStorage

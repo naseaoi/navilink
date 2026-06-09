@@ -1,7 +1,7 @@
 import { getAuthPayload } from '../_shared/auth.js';
 import { withTimestamp } from '../_shared/data.js';
 import { prepareSaveData } from '../_shared/saveData.js';
-import { fetchWebDavJson, getWebDavEnv, hasWebDavConfig, putWebDavJson } from '../_shared/webdav.js';
+import { fetchWebDavJson, getWebDavEnv, hasWebDavConfig, putWebDavJsonBatch } from '../_shared/webdav.js';
 
 export default async function handler(request, response) {
   const { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH, AUTH_SECRET } = process.env;
@@ -27,8 +27,17 @@ export default async function handler(request, response) {
     });
     const savedPublic = withTimestamp('public.json', prepared.publicData);
     const savedPrivate = withTimestamp('private.json', prepared.privateData);
-    await putWebDavJson('public.json', savedPublic, env);
-    await putWebDavJson('private.json', savedPrivate, env);
+    await putWebDavJsonBatch({
+      entries: [
+        { fileName: 'public.json', data: savedPublic },
+        { fileName: 'private.json', data: savedPrivate }
+      ],
+      originals: {
+        'public.json': currentPublic,
+        'private.json': currentPrivate
+      },
+      env
+    });
     return response.json({ publicData: savedPublic, privateData: savedPrivate });
   } catch (error) {
     if (error?.statusCode === 400 || error?.statusCode === 409) {

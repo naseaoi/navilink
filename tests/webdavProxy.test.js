@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
+import { putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { proxyWebDavDataFile } from '../api/_shared/webdavProxy.js';
 
 const env = {
@@ -52,5 +53,65 @@ describe('webdav proxy', () => {
 
     const result = await proxyWebDavDataFile({ method: 'GET', fileName: 'public.json', env });
     assert.deepEqual(result.body, { ok: true });
+  });
+
+  it('rolls back committed files when batch write fails', async () => {
+    const calls = [];
+    const responses = [
+      { status: 204, ok: true },
+      { status: 500, ok: false },
+      { status: 204, ok: true }
+    ];
+    global.fetch = async (...args) => {
+      calls.push(args);
+      return responses.shift();
+    };
+
+    await assert.rejects(() => putWebDavJsonBatch({
+      entries: [
+        { fileName: 'public.json', data: { version: 'next-public' } },
+        { fileName: 'private.json', data: { version: 'next-private' } }
+      ],
+      originals: {
+        'public.json': { version: 'old-public' },
+        'private.json': { version: 'old-private' }
+      },
+      env
+    }), /WebDAV write failed: 500/);
+
+    assert.equal(calls.length, 3);
+    assert.match(calls[0][0], /public\.json$/);
+    assert.match(calls[1][0], /private\.json$/);
+    assert.match(calls[2][0], /public\.json$/);
+    assert.equal(calls[2][1].body, JSON.stringify({ version: 'old-public' }));
+  });
+
+  it('deletes new files during batch rollback', async () => {
+    const calls = [];
+    const responses = [
+      { status: 204, ok: true },
+      { status: 500, ok: false },
+      { status: 204, ok: true }
+    ];
+    global.fetch = async (...args) => {
+      calls.push(args);
+      return responses.shift();
+    };
+
+    await assert.rejects(() => putWebDavJsonBatch({
+      entries: [
+        { fileName: 'public.json', data: { version: 'next-public' } },
+        { fileName: 'private.json', data: { version: 'next-private' } }
+      ],
+      originals: {
+        'public.json': null,
+        'private.json': null
+      },
+      env
+    }), /WebDAV write failed: 500/);
+
+    assert.equal(calls.length, 3);
+    assert.match(calls[2][0], /public\.json$/);
+    assert.equal(calls[2][1].method, 'DELETE');
   });
 });

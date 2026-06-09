@@ -46,3 +46,37 @@ export const putWebDavJson = async (fileName, data, env = process.env) => {
   }
   if (!response.ok) throw new Error(`WebDAV write failed: ${response.status}`);
 };
+
+export const deleteWebDavFile = async (fileName, env = process.env) => {
+  const { targetUrl } = buildWebDavUrls(fileName, env);
+  const response = await fetch(targetUrl, {
+    method: 'DELETE',
+    headers: { Authorization: getWebDavAuthHeader(env) }
+  });
+  if (response.status === 404) return;
+  if (!response.ok) throw new Error(`WebDAV delete failed: ${response.status}`);
+};
+
+export const putWebDavJsonBatch = async ({ entries, originals = {}, env = process.env }) => {
+  const committed = [];
+  try {
+    for (const entry of entries) {
+      await putWebDavJson(entry.fileName, entry.data, env);
+      committed.push(entry.fileName);
+    }
+  } catch (error) {
+    for (const fileName of committed.reverse()) {
+      const original = originals[fileName];
+      try {
+        if (original) {
+          await putWebDavJson(fileName, original, env);
+        } else if (Object.hasOwn(originals, fileName)) {
+          await deleteWebDavFile(fileName, env);
+        }
+      } catch (rollbackError) {
+        console.error(`[WebDAV Rollback Error] ${fileName}: ${rollbackError.message}`);
+      }
+    }
+    throw error;
+  }
+};
