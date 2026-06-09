@@ -4,7 +4,7 @@ import { validateDataFilePayload, validateLoginPayload } from '../api/_shared/va
 
 const publicData = {
   settings: { title: 'NaviLink', icon: '', footerText: 'Footer' },
-  categories: [{ id: 'cat_1', name: 'Tools', order: 0 }],
+  categories: [{ id: 'cat_1', name: 'Tools', icon: 'wrench', order: 0 }],
   cards: [{
     id: 'card_1',
     categoryId: 'cat_1',
@@ -20,7 +20,15 @@ describe('validation helpers', () => {
   it('normalizes public data', () => {
     const result = validateDataFilePayload('public.json', publicData);
     assert.equal(result.settings.title, 'NaviLink');
+    assert.equal(result.categories[0].icon, 'wrench');
     assert.equal(result.cards[0].url, 'https://github.com/');
+  });
+
+  it('rejects unknown category icons', () => {
+    assert.throws(() => validateDataFilePayload('public.json', {
+      ...publicData,
+      categories: [{ ...publicData.categories[0], icon: 'unknown-icon' }]
+    }), /icon is invalid/);
   });
 
   it('rejects unsafe card URLs', () => {

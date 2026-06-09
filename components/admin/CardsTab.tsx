@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit2, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { Edit2, GripVertical, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Button, Input, Modal, Select } from '../UI';
 import { LinkCard, PublicData } from '../../types';
 import { CachedIcon } from '../public/CachedIcon';
@@ -10,16 +10,40 @@ interface CardsTabProps {
   confirm: (title: string, message: string, onConfirm: () => void, variant?: 'danger' | 'primary') => void;
 }
 
+const PREVIEW_URL_PATH = '/navilink-preview/';
+const MAX_PREVIEW_COUNT = 60;
+
+const isHttpUrl = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+const isPreviewCard = (card: LinkCard) => {
+  try {
+    const parsed = new URL(card.url);
+    return parsed.hostname === 'example.com' && parsed.pathname.startsWith(PREVIEW_URL_PATH) && card.title.startsWith('预览卡片 ');
+  } catch {
+    return false;
+  }
+};
+
 export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Partial<LinkCard>>({});
   const [filterCat, setFilterCat] = useState('all');
+  const [previewCount, setPreviewCount] = useState(12);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   const filtered = filterCat === 'all' ? data.cards : data.cards.filter((card) => card.categoryId === filterCat);
   const sorted = [...filtered].sort((a, b) => a.order - b.order);
   const categoryOptions = data.categories.map((category) => ({ value: category.id, label: category.name }));
+  const invalidCards = data.cards.filter((card) => !isHttpUrl(card.url) || (card.icon?.trim() && !isHttpUrl(card.icon.trim())));
+  const previewCards = data.cards.filter(isPreviewCard);
 
   const reorderCards = (targetId?: string) => {
     if (!draggedId) return data.cards;
@@ -74,13 +98,36 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
 
   const openEdit = (card: LinkCard) => { setEditingCard(card); setIsModalOpen(true); };
 
-  const isHttpUrl = (value: string) => {
-    try {
-      const parsed = new URL(value);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
+  const addPreviewCards = () => {
+    if (!data.categories.length) return;
+    const count = Math.min(Math.max(Math.trunc(previewCount) || 1, 1), MAX_PREVIEW_COUNT);
+    const stamp = Date.now();
+    const maxOrder = Math.max(...data.cards.map((card) => card.order), -1);
+    const nextCards = Array.from({ length: count }, (_, index) => ({
+      id: `preview_${stamp}_${index}`,
+      categoryId: data.categories[Math.floor(Math.random() * data.categories.length)].id,
+      title: `预览卡片 ${String(index + 1).padStart(2, '0')}`,
+      description: ['效率工具', '内容收藏', '项目入口', '设计参考'][index % 4],
+      url: `https://example.com${PREVIEW_URL_PATH}${stamp}-${index + 1}`,
+      icon: '',
+      order: maxOrder + index + 1
+    }));
+    onChange({ ...data, cards: [...data.cards, ...nextCards] });
+  };
+
+  const removePreviewCards = () => {
+    if (!previewCards.length) return;
+    confirm('删除预览卡片', `将删除 ${previewCards.length} 张预览卡片。`, () => {
+      onChange({ ...data, cards: data.cards.filter((card) => !isPreviewCard(card)) });
+    }, 'danger');
+  };
+
+  const removeInvalidCards = () => {
+    if (!invalidCards.length) return;
+    confirm('删除无效卡片', `将删除 ${invalidCards.length} 张 URL 或图标无效的卡片。`, () => {
+      const invalidIds = new Set(invalidCards.map((card) => card.id));
+      onChange({ ...data, cards: data.cards.filter((card) => !invalidIds.has(card.id)) });
+    }, 'danger');
   };
 
   const save = () => {
@@ -106,14 +153,35 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <Select 
           options={[{value:'all', label:'所有卡片'}, ...categoryOptions]} 
           value={filterCat} 
           onChange={setFilterCat} 
-          className="w-auto min-w-[120px] max-w-[50%]" 
+          className="w-full min-w-[150px] sm:w-auto" 
         />
-        <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:'https://'}); setIsModalOpen(true);}} size="icon" className="rounded-control w-10 h-10 shrink-0" title="新增卡片"><Plus size={20}/></Button>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-28">
+            <Input
+              label="预览数量"
+              type="number"
+              min={1}
+              max={MAX_PREVIEW_COUNT}
+              value={previewCount}
+              onChange={(event) => setPreviewCount(Number(event.target.value))}
+            />
+          </div>
+          <Button onClick={addPreviewCards} variant="secondary" className="h-11 gap-2">
+            <Sparkles size={16} /> 新增预览
+          </Button>
+          <Button onClick={removePreviewCards} variant="secondary" disabled={!previewCards.length} className="h-11">
+            清理预览
+          </Button>
+          <Button onClick={removeInvalidCards} variant="danger" disabled={!invalidCards.length} className="h-11">
+            清理无效
+          </Button>
+          <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:''}); setIsModalOpen(true);}} size="icon" className="rounded-control w-11 h-11 shrink-0" title="新增卡片"><Plus size={20}/></Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-x-6 gap-y-6">
@@ -140,7 +208,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
               onClick={(e) => e.stopPropagation()}
               className="cursor-grab active:cursor-grabbing p-0.5 -ml-0.5 text-3 hover:text-2 touch-none shrink-0"
             >
-              <GripVertical size={10} />
+              <GripVertical size={16} />
             </div>
 
             <div className="w-10 h-10 shrink-0 bg-subtle rounded-control flex items-center justify-center border border-subtle overflow-hidden group-hover:scale-105 transition-transform duration-300">

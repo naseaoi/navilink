@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Home, Monitor, Moon, Search, Sun } from 'lucide-react';
+import { Home, Monitor, Moon, Sun } from 'lucide-react';
 import { useMatch, useNavigate } from 'react-router-dom';
 import { Category } from '../../types';
 import { categoryPath, getCategoryIcon, sortCategories } from './categoryIcons';
@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, theme, onToggleThe
             <span>首页</span>
           </button>
           {sorted.map((category, index) => {
-            const ItemIcon = getCategoryIcon(index);
+            const ItemIcon = getCategoryIcon(category, index);
             return (
               <button
                 key={category.id}
@@ -103,17 +103,14 @@ interface MobileBarProps {
   onSearchOpen: () => void;
 }
 
-export const MobileBar: React.FC<MobileBarProps> = ({ theme, onToggleTheme, onLogoClick, onSearchOpen }) => {
+export const MobileBar: React.FC<MobileBarProps> = ({ theme, onToggleTheme, onLogoClick }) => {
   const ThemeIcon = useThemeIcon(theme);
   const iconButtonClass = 'flex h-9 w-9 items-center justify-center rounded-pill text-2 transition-colors hover:bg-subtle hover:text-1';
 
   return (
-    <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-subtle bg-canvas/80 px-4 backdrop-blur-xl md:hidden">
-      <BrandMark onClick={onLogoClick} className="text-[24px]" />
+    <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-transparent bg-transparent px-4 md:hidden">
+      <BrandMark onClick={onLogoClick} className="ml-2 text-[34px]" />
       <div className="flex items-center gap-1">
-        <button type="button" onClick={onSearchOpen} className={iconButtonClass} aria-label="搜索">
-          <Search size={18} strokeWidth={2.1} />
-        </button>
         {onToggleTheme && (
           <button type="button" onClick={onToggleTheme} className={iconButtonClass} aria-label="切换主题">
             <ThemeIcon size={17} strokeWidth={2.1} />

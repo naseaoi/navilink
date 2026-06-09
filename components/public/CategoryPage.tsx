@@ -16,7 +16,7 @@ export const CategoryPage: React.FC = () => {
 
   if (!category) return hasFetchedData ? <Navigate to="/" replace /> : null;
 
-  const Icon = getCategoryIcon(index);
+  const Icon = getCategoryIcon(category, index);
   const cards = data.cards.filter((c) => c.categoryId === category.id).sort((a, b) => a.order - b.order);
 
   return (

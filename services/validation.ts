@@ -1,4 +1,5 @@
 import { PrivateData, PublicData } from '../types';
+import { CATEGORY_ICON_OPTIONS } from '../components/public/categoryIcons';
 
 const httpUrl = (value: string) => {
   try {
@@ -22,6 +23,8 @@ const optionalText = (value: string | undefined, label: string, max: number) => 
   return null;
 };
 
+const validCategoryIcons = new Set(CATEGORY_ICON_OPTIONS.map((option) => option.value));
+
 export const validatePublicDataForSave = (data: PublicData) => {
   const titleError = requireText(data.settings.title, '站点标题', 80);
   if (titleError) return titleError;
@@ -35,6 +38,8 @@ export const validatePublicDataForSave = (data: PublicData) => {
   for (const category of data.categories) {
     const nameError = requireText(category.name, '分类名称', 80);
     if (nameError) return nameError;
+    const icon = (category.icon || '').trim();
+    if (icon && !validCategoryIcons.has(icon)) return `分类「${category.name || category.id}」图标无效`;
   }
 
   for (const card of data.cards) {

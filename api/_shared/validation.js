@@ -5,10 +5,28 @@ const MAX_TITLE_LENGTH = 80;
 const MAX_DESCRIPTION_LENGTH = 240;
 const MAX_URL_LENGTH = 1000;
 const MAX_FOOTER_LENGTH = 240;
+const MAX_ICON_KEY_LENGTH = 80;
 const MAX_USERNAME_LENGTH = 64;
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 128;
 const SCRYPT_PATTERN = /^scrypt\$[a-f0-9]{32}\$[a-f0-9]{128}$/i;
+const CATEGORY_ICON_KEYS = new Set([
+  'book-open',
+  'code-2',
+  'star',
+  'compass',
+  'layers',
+  'globe',
+  'wrench',
+  'briefcase-business',
+  'graduation-cap',
+  'image',
+  'lightbulb',
+  'music',
+  'palette',
+  'rocket',
+  'shopping-bag'
+]);
 
 const fail = (message) => {
   const error = new Error(message);
@@ -71,9 +89,12 @@ const validateSettings = (settings) => {
 
 const validateCategory = (category, index) => {
   const input = asObject(category, `categories.${index}`);
+  const icon = asString(input.icon ?? '', `categories.${index}.icon`, MAX_ICON_KEY_LENGTH, false);
+  if (icon && !CATEGORY_ICON_KEYS.has(icon)) fail(`categories.${index}.icon is invalid`);
   return {
     id: asString(input.id, `categories.${index}.id`, MAX_ID_LENGTH),
     name: asString(input.name, `categories.${index}.name`, MAX_TITLE_LENGTH),
+    icon,
     order: asOrder(input.order, `categories.${index}.order`)
   };
 };

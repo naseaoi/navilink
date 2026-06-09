@@ -32,7 +32,7 @@ export const CategoryGroups: React.FC<CategoryGroupsProps> = ({ categories, card
         <GroupCard
           key={category.id}
           category={category}
-          Icon={getCategoryIcon(index)}
+          Icon={getCategoryIcon(category, index)}
           cards={cardsByCategory.get(category.id) ?? []}
           onCardClick={onCardClick}
         />

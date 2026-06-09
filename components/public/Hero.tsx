@@ -39,10 +39,10 @@ interface HeroProps {
 }
 
 export const Hero: React.FC<HeroProps> = ({ title = 'Hello', subtitle = '探索高效工具，收藏优质网站' }) => (
-  <div className="relative pb-2 pt-8 text-center md:pt-14">
+  <div className="relative pb-2 pt-7 text-center md:pt-14">
     <div className="relative inline-block">
-      <SparkMark className="absolute -left-7 -top-3 hidden md:block" />
-      <DotGrid className="absolute -right-20 top-2 hidden lg:block" />
+      <SparkMark className="absolute -left-6 -top-3 block scale-75 md:-left-7 md:scale-100" />
+      <DotGrid className="absolute -right-12 top-1 block scale-[0.58] md:-right-16 md:scale-75 lg:-right-20 lg:top-2 lg:scale-100" />
       <h1 className="font-display text-6xl font-bold tracking-tightest text-1 md:text-7xl lg:text-[88px]">
         {title}
         <span className="text-accent">.</span>
