@@ -99,22 +99,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
 
     setIsSaving(true);
     try {
-      const privatePayload = newPassword.trim()
+      let privatePayload = newPassword.trim()
         ? { ...localPrivate, admin: { ...localPrivate.admin, passwordHash: newPassword.trim() } }
         : localPrivate;
+      if (mustChangePassword) {
+        privatePayload = await webdav.changePassword(localPrivate.admin.username, newPassword.trim());
+        setLocalPrivate(privatePayload);
+        onUpdatePrivate(privatePayload);
+        onPasswordPolicyResolved();
+      }
       if (shouldSavePublic) {
         const saved = await webdav.saveAllData(localPublic, privatePayload);
         onUpdatePublic(saved.publicData);
         setLocalPublic(saved.publicData);
         setLocalPrivate(saved.privateData);
         onUpdatePrivate(saved.privateData);
-      } else {
+      } else if (!mustChangePassword) {
         await webdav.savePrivateData(privatePayload);
         const savedPrivate = await webdav.fetchPrivateData();
         setLocalPrivate(savedPrivate);
         onUpdatePrivate(savedPrivate);
       }
-      if (mustChangePassword) onPasswordPolicyResolved();
       setNewPassword('');
       clearChanges();
       await refreshStorageStatus();

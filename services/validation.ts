@@ -59,6 +59,7 @@ export const validatePrivateDataForSave = (data: PrivateData, newPassword: strin
   if (usernameError) return usernameError;
   const password = newPassword.trim();
   if (mustChangePassword && !password) return '请设置新密码';
+  if (mustChangePassword && password === 'admin123') return '新密码不能继续使用默认密码';
   if (password && password.length < 8) return '新密码至少 8 个字符';
   if (password.length > 128) return '新密码不能超过 128 个字符';
   return null;

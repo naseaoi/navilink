@@ -8,7 +8,13 @@ import { createLoginRateLimiter } from './_shared/rateLimit.js';
 import { withTimestamp } from './_shared/data.js';
 import { fetchWebDavJson, getWebDavEnv, hasWebDavConfig, putWebDavJson } from './_shared/webdav.js';
 
-const loginRateLimiter = createLoginRateLimiter();
+const getVercelClientIp = (request) => {
+  const forwarded = request.headers['x-vercel-forwarded-for'] || request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
+  return request.socket?.remoteAddress || 'unknown';
+};
+
+const loginRateLimiter = createLoginRateLimiter({ getClientIp: getVercelClientIp });
 
 const sendAuthResult = (response, result) => {
   Object.entries(result.headers || {}).forEach(([name, value]) => response.setHeader(name, value));

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { fetchWebDavJson, fetchWebDavJsonWithMeta, putWebDavJson, putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { getUpdatedAt, withTimestamp } from '../api/_shared/data.js';
 
-export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, defaultPrivateData }) => {
+export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, defaultPublicData, defaultPrivateData }) => {
   if (!existsSync(dataDir)) {
     console.log(`[System] Creating data directory: ${dataDir}`);
     mkdirSync(dataDir, { recursive: true });
@@ -172,6 +172,13 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     return { mode, privateData };
   };
 
+  const readPublicOrDefault = async () => {
+    const mode = await getStorageMode();
+    let publicData = await readDataFromStorage(mode, 'public.json');
+    if (!publicData) publicData = await writeDataToStorage(mode, 'public.json', defaultPublicData);
+    return publicData;
+  };
+
   const readStatus = async () => {
     const localPublic = await readDataFromStorage('local', 'public.json');
     const localPrivate = await readDataFromStorage('local', 'private.json');
@@ -192,6 +199,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     const filePath = path.join(dataDir, fileName);
     try {
       if (req.method === 'GET') {
+        if (fileName === 'public.json') return res.json(await readPublicOrDefault());
         if (memoryCache[fileName]) return res.json(memoryCache[fileName]);
         const jsonData = await readLocalJson(filePath);
         if (!jsonData) return res.status(404).json({ error: 'File not found' });
@@ -219,6 +227,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     writeCurrentData,
     writeCurrentDataBatch,
     readPrivateOrDefault,
+    readPublicOrDefault,
     readStatus,
     handleLocalStorage
   };

@@ -34,7 +34,8 @@ export const clearPasswordPolicyFlag = () => {
 export const logoutAuthSession = async () => {
   clearAuthSession();
   try {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Logout endpoint unavailable');
   } catch {
     try {
       await fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' });

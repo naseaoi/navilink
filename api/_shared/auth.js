@@ -84,6 +84,13 @@ export const getAuthToken = (request) => {
 
 export const getAuthPayload = (request, secret) => verifyToken(getAuthToken(request), secret);
 
+export const getWritableAuthPayload = (request, secret) => {
+  const payload = getAuthPayload(request, secret);
+  if (!payload) return { payload: null, error: 'UNAUTHORIZED' };
+  if (payload.mustChangePassword) return { payload: null, error: 'PASSWORD_CHANGE_REQUIRED' };
+  return { payload, error: null };
+};
+
 const getCookieOptions = (env = process.env) => {
   const sameSiteInput = String(env.COOKIE_SAMESITE || 'Lax').trim().toLowerCase();
   const sameSiteMap = { lax: 'Lax', strict: 'Strict', none: 'None' };

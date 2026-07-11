@@ -152,3 +152,8 @@ export const validateLoginPayload = (body = {}) => ({
   password: asString(body.password, 'password', MAX_PASSWORD_LENGTH),
   remember: !!body.remember
 });
+
+export const validatePasswordChangePayload = (body = {}) => ({
+  username: asString(body.username, 'username', MAX_USERNAME_LENGTH),
+  password: asString(body.password, 'password', MAX_PASSWORD_LENGTH)
+});

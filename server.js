@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { createDefaultPrivateData } from './api/_shared/auth.js';
+import { createDefaultPublicData } from './api/_shared/defaultData.js';
 import { createLoginRateLimiter } from './api/_shared/rateLimit.js';
 import { hasWebDavConfig } from './api/_shared/webdav.js';
 import { registerAuthRoutes, createRequireAuth } from './server/authRoutes.js';
@@ -34,6 +35,7 @@ const LOGIN_MAX_ATTEMPTS = Number(process.env.LOGIN_MAX_ATTEMPTS || 5);
 const USE_WEBDAV = hasWebDavConfig();
 
 const app = express();
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
 const corsOptions = {
   origin(origin, callback) {
@@ -97,11 +99,13 @@ const loadAuthSecret = () => {
 AUTH_SECRET = loadAuthSecret();
 
 const DEFAULT_PRIVATE_DATA = createDefaultPrivateData();
+const DEFAULT_PUBLIC_DATA = createDefaultPublicData();
 const loginRateLimiter = createLoginRateLimiter({ windowMs: LOGIN_WINDOW_MS, maxAttempts: LOGIN_MAX_ATTEMPTS });
 const storage = createStorageService({
   dataDir: DATA_DIR,
   storageConfigPath: STORAGE_CONFIG_PATH,
   useWebDav: USE_WEBDAV,
+  defaultPublicData: DEFAULT_PUBLIC_DATA,
   defaultPrivateData: DEFAULT_PRIVATE_DATA
 });
 const requireAuth = createRequireAuth(AUTH_SECRET);

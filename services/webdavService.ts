@@ -178,6 +178,20 @@ class WebDavService {
     if (!response.ok) throw new Error('Failed to save private data');
   }
 
+  async changePassword(username: string, password: string): Promise<PrivateData> {
+    const response = await fetch('/api/auth/password', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password })
+    });
+    if (!response.ok) throw new Error('Failed to change password');
+    const result: { privateData: PrivateData } = await response.json();
+    return result.privateData;
+  }
+
   async saveAllData(publicData: PublicData, privateData: PrivateData): Promise<{ publicData: PublicData; privateData: PrivateData }> {
     const response = await fetch('/api/storage/save', {
       method: 'POST',

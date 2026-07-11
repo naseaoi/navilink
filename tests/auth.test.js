@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   buildAuthCookie,
   buildClearAuthCookie,
+  getWritableAuthPayload,
   hashPassword,
   signToken,
   verifyPassword,
@@ -10,6 +11,7 @@ import {
 } from '../api/_shared/auth.js';
 import { loginAdmin } from '../api/_shared/authService.js';
 import { createLoginRateLimiter } from '../api/_shared/rateLimit.js';
+import { changeAdminPassword } from '../api/_shared/passwordService.js';
 
 const createRequest = () => ({ headers: {}, ip: '127.0.0.1' });
 
@@ -58,6 +60,12 @@ describe('auth helpers', () => {
       });
     }
   });
+
+  it('rejects storage writes until the default password is changed', () => {
+    const token = signToken({ username: 'admin', exp: Date.now() + 1000, mustChangePassword: true }, 'secret');
+    const request = { headers: { authorization: `Bearer ${token}` } };
+    assert.equal(getWritableAuthPayload(request, 'secret').error, 'PASSWORD_CHANGE_REQUIRED');
+  });
 });
 
 describe('auth service', () => {
@@ -103,6 +111,22 @@ describe('auth service', () => {
     assert.equal(limited.headers['Retry-After'], '60');
   });
 
+  it('limits repeated failures across different usernames from one IP', async () => {
+    const loginRateLimiter = createFixedRateLimiter({ maxAttempts: 2 });
+    const attempt = (username) => loginAdmin({
+      request: createRequest(),
+      body: { username, password: 'wrong-password' },
+      authSecret: 'secret',
+      loginRateLimiter,
+      readPrivateData: async () => ({ admin: { username: 'admin', passwordHash: hashPassword('admin123') } }),
+      writePrivateData: async () => {}
+    });
+
+    assert.equal((await attempt('first')).status, 401);
+    assert.equal((await attempt('second')).status, 401);
+    assert.equal((await attempt('third')).status, 429);
+  });
+
   it('upgrades plain text password storage after login', async () => {
     let savedPrivateData = null;
     const result = await loginAdmin({
@@ -121,5 +145,31 @@ describe('auth service', () => {
     assert.equal(result.status, 200);
     assert.equal(result.body.mustChangePassword, true);
     assert.match(savedPrivateData.admin.passwordHash, /^scrypt\$/);
+  });
+
+  it('changes the default password and issues an unrestricted session', async () => {
+    let saved = null;
+    const result = await changeAdminPassword({
+      body: { username: 'owner', password: 'new-password-123' },
+      authPayload: { username: 'admin', exp: Date.now() + 60_000, mustChangePassword: true },
+      authSecret: 'secret',
+      writePrivateData: async (privateData) => { saved = privateData; }
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(saved.admin.username, 'owner');
+    assert.equal(verifyPassword('new-password-123', saved.admin.passwordHash), true);
+    const token = decodeURIComponent(result.headers['Set-Cookie'].match(/navilink_session=([^;]+)/)[1]);
+    assert.equal(verifyToken(token, 'secret').mustChangePassword, false);
+  });
+
+  it('does not accept the published default password as a replacement', async () => {
+    const result = await changeAdminPassword({
+      body: { username: 'admin', password: 'admin123' },
+      authPayload: { username: 'admin', exp: Date.now() + 60_000, mustChangePassword: true },
+      authSecret: 'secret',
+      writePrivateData: async () => { throw new Error('unexpected write'); }
+    });
+    assert.equal(result.status, 400);
   });
 });

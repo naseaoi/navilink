@@ -1,40 +1,41 @@
-const defaultGetClientIp = (request) => {
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim();
-  }
-  if (Array.isArray(forwarded) && forwarded[0]) {
-    return forwarded[0].split(',')[0].trim();
-  }
-  return request.ip || request.socket?.remoteAddress || 'unknown';
+const defaultGetClientIp = (request) => request.ip || request.socket?.remoteAddress || 'unknown';
+
+const asPositiveInteger = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 };
 
 export const createLoginRateLimiter = ({
-  windowMs = Number(process.env.LOGIN_WINDOW_MS || 60_000),
-  maxAttempts = Number(process.env.LOGIN_MAX_ATTEMPTS || 5),
+  windowMs = process.env.LOGIN_WINDOW_MS,
+  maxAttempts = process.env.LOGIN_MAX_ATTEMPTS,
   getClientIp = defaultGetClientIp
 } = {}) => {
+  const effectiveWindowMs = asPositiveInteger(windowMs, 60_000);
+  const effectiveMaxAttempts = asPositiveInteger(maxAttempts, 5);
   const attempts = new Map();
 
-  const getKey = (request, username) => `${getClientIp(request)}:${(username || '').toLowerCase()}`;
+  const getKeys = (request, username) => {
+    const ip = getClientIp(request);
+    return [`ip:${ip}`, `account:${ip}:${(username || '').toLowerCase()}`];
+  };
 
   const getState = (key) => {
     const now = Date.now();
     const entry = attempts.get(key);
     if (!entry) return { limited: false, retryAfterSeconds: 0 };
-    if (now - entry.firstFailedAt > windowMs) {
+    if (now - entry.firstFailedAt > effectiveWindowMs) {
       attempts.delete(key);
       return { limited: false, retryAfterSeconds: 0 };
     }
-    if (entry.count < maxAttempts) return { limited: false, retryAfterSeconds: 0 };
-    const retryAfterMs = Math.max(0, windowMs - (now - entry.firstFailedAt));
+    if (entry.count < effectiveMaxAttempts) return { limited: false, retryAfterSeconds: 0 };
+    const retryAfterMs = Math.max(0, effectiveWindowMs - (now - entry.firstFailedAt));
     return { limited: true, retryAfterSeconds: Math.ceil(retryAfterMs / 1000) };
   };
 
   const recordFailure = (key) => {
     const now = Date.now();
     const entry = attempts.get(key);
-    if (!entry || now - entry.firstFailedAt > windowMs) {
+    if (!entry || now - entry.firstFailedAt > effectiveWindowMs) {
       attempts.set(key, { count: 1, firstFailedAt: now });
       return;
     }
@@ -42,9 +43,14 @@ export const createLoginRateLimiter = ({
     attempts.set(key, entry);
   };
 
-  const clear = (key) => {
-    attempts.delete(key);
+  const clear = (key) => attempts.delete(key);
+
+  const cleanup = () => {
+    const now = Date.now();
+    attempts.forEach((entry, key) => {
+      if (now - entry.firstFailedAt > effectiveWindowMs) attempts.delete(key);
+    });
   };
 
-  return { getKey, getState, recordFailure, clear };
+  return { getKeys, getState, recordFailure, clear, cleanup };
 };

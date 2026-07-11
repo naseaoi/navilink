@@ -18,12 +18,14 @@ export const AdminLogin: React.FC<{ onLogin: (mustChangePassword: boolean) => vo
     setError('');
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/auth/login', {
+      const options: RequestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         body: JSON.stringify({ username, password, remember })
-      });
+      };
+      let response = await fetch('/api/auth/login', options);
+      if (response.status === 404) response = await fetch('/api/auth', options);
 
       if (!response.ok) throw new Error('Invalid credentials');
       const { exp, mustChangePassword } = await response.json();

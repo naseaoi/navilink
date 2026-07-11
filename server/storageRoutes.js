@@ -23,7 +23,7 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
     const isPrivate = fileName === 'private.json';
     const isWrite = req.method === 'PUT';
     if (isPrivate || isWrite) {
-      const payload = requireAuth(req, res);
+      const payload = requireAuth(req, res, { allowPasswordChangeRequired: isPrivate && !isWrite });
       if (!payload) return;
     }
 
@@ -41,6 +41,9 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
     if (storageMode === 'webdav') {
       try {
         const result = await proxyWebDavDataFile({ method: req.method, fileName, body: req.body });
+        if (result.status === 404 && fileName === 'public.json') {
+          return res.json(await storage.readPublicOrDefault());
+        }
         if (result.json) return res.status(result.status).json(result.body);
         return res.status(result.status).send(result.body);
       } catch (error) {

@@ -136,6 +136,7 @@ pm2 start server.js --name navilink
 | `CORS_ORIGINS` | 否 | 空（允许所有） | 允许的跨域来源，逗号分隔 |
 | `LOGIN_WINDOW_MS` | 否 | `60000` | 登录限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 窗口内最大登录失败次数 |
+| `TRUST_PROXY` | 否 | `loopback` | Express 可信代理范围，公网反向代理部署时按网络拓扑配置 |
 | `COOKIE_SAMESITE` | 否 | `Lax` | Cookie SameSite 策略，支持 `Lax` / `Strict` / `None` |
 | `COOKIE_DOMAIN` | 否 | - | Cookie Domain |
 | `COOKIE_SECURE` | 否 | 自动 | 是否强制 Secure Cookie，`COOKIE_SAMESITE=None` 时会自动启用 |
@@ -166,7 +167,7 @@ pm2 start server.js --name navilink
 
 默认账号：`admin` / `admin123`
 
-- 首次登录会强制要求修改默认密码
+- 首次登录会强制要求修改默认密码，修改前服务端拒绝数据写入、同步和存储模式操作
 
 ## 项目结构
 

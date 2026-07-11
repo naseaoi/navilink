@@ -26,8 +26,10 @@ export const loginAdmin = async ({
   }
 
   const { username, password, remember } = loginPayload;
-  const rateKey = loginRateLimiter.getKey(request, username);
-  const rateState = loginRateLimiter.getState(rateKey);
+  loginRateLimiter.cleanup();
+  const rateKeys = loginRateLimiter.getKeys(request, username);
+  const rateState = rateKeys.map(loginRateLimiter.getState).find((state) => state.limited)
+    || { limited: false, retryAfterSeconds: 0 };
   if (rateState.limited) {
     return {
       status: 429,
@@ -40,11 +42,11 @@ export const loginAdmin = async ({
   const stored = privateData?.admin?.passwordHash || '';
   const isValid = verifyPassword(password, stored) && privateData?.admin?.username === username;
   if (!isValid) {
-    loginRateLimiter.recordFailure(rateKey);
+    rateKeys.forEach(loginRateLimiter.recordFailure);
     return { status: 401, body: { error: 'Invalid credentials' } };
   }
 
-  loginRateLimiter.clear(rateKey);
+  rateKeys.forEach(loginRateLimiter.clear);
   const mustChangePassword = verifyPassword(DEFAULT_ADMIN_PASSWORD, stored);
 
   if (stored && !stored.startsWith('scrypt$')) {
