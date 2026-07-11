@@ -126,10 +126,13 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
         const current = await storage.readPrivateOrDefault();
         privateData = current.privateData;
       }
-      await storage.writeDataToStorage(to, 'public.json', publicData);
-      await storage.writeDataToStorage(to, 'private.json', normalizePrivateData(privateData));
+      await storage.writeDataBatchToStorage(to, [
+        { fileName: 'public.json', data: validateDataFilePayload('public.json', publicData) },
+        { fileName: 'private.json', data: normalizePrivateData(validateDataFilePayload('private.json', privateData)) }
+      ]);
       return res.json({ success: true });
     } catch (error) {
+      if (error?.statusCode === 400) return sendValidationError(res, error);
       console.error(`[Storage Sync Error] ${error.message}`);
       return res.status(500).json({ error: 'Sync Error' });
     }

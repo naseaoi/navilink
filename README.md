@@ -133,6 +133,9 @@ pm2 start server.js --name navilink
 | `WEBDAV_USERNAME` | WebDAV 模式 | - | WebDAV 用户名 |
 | `WEBDAV_PASSWORD` | WebDAV 模式 | - | WebDAV 密码 |
 | `WEBDAV_PATH` | 否 | `navilink` | WebDAV 存储路径 |
+| `WEBDAV_ALLOW_HTTP` | 否 | `false` | 是否允许 HTTP WebDAV，仅限可信内网调试 |
+| `WEBDAV_TIMEOUT_MS` | 否 | `10000` | WebDAV 请求超时（毫秒，最大 `60000`） |
+| `WEBDAV_MAX_RESPONSE_BYTES` | 否 | `10485760` | WebDAV 响应体上限（最大 20 MiB） |
 | `CORS_ORIGINS` | 否 | 空（允许所有） | 允许的跨域来源，逗号分隔 |
 | `LOGIN_WINDOW_MS` | 否 | `60000` | 登录限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 窗口内最大登录失败次数 |

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
-import { putWebDavJsonBatch } from '../api/_shared/webdav.js';
+import { buildWebDavUrls, putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { proxyWebDavDataFile } from '../api/_shared/webdavProxy.js';
 
 const env = {
@@ -45,14 +45,32 @@ describe('webdav proxy', () => {
   });
 
   it('returns parsed JSON for GET', async () => {
-    global.fetch = async () => ({
+    global.fetch = async () => new Response(JSON.stringify({ ok: true }), {
       status: 200,
-      ok: true,
-      json: async () => ({ ok: true })
+      headers: { 'Content-Type': 'application/json' }
     });
 
     const result = await proxyWebDavDataFile({ method: 'GET', fileName: 'public.json', env });
     assert.deepEqual(result.body, { ok: true });
+  });
+
+  it('rejects insecure WebDAV URLs by default', () => {
+    assert.throws(() => buildWebDavUrls('public.json', {
+      ...env,
+      WEBDAV_URL: 'http://dav.example.com'
+    }), /must use HTTPS/);
+  });
+
+  it('rejects oversized WebDAV responses', async () => {
+    global.fetch = async () => new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Length': '100' }
+    });
+    await assert.rejects(() => proxyWebDavDataFile({
+      method: 'GET',
+      fileName: 'public.json',
+      env: { ...env, WEBDAV_MAX_RESPONSE_BYTES: '10' }
+    }), /too large/);
   });
 
   it('rolls back committed files when batch write fails', async () => {

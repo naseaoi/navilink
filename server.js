@@ -51,6 +51,17 @@ const corsOptions = {
 // 中间件
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+app.use((_req, res, next) => {
+  res.set({
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY'
+  });
+  return next();
+});
 app.use(express.json({ limit: '10mb' })); // 支持大 JSON 数据
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'no-store');

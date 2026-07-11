@@ -9,6 +9,7 @@ const MAX_ICON_KEY_LENGTH = 80;
 const MAX_USERNAME_LENGTH = 64;
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 128;
+const MAX_ABS_ORDER = 1_000_000;
 const SCRYPT_PATTERN = /^scrypt\$[a-f0-9]{32}\$[a-f0-9]{128}$/i;
 const CATEGORY_ICON_KEYS = new Set([
   'book-open',
@@ -59,7 +60,25 @@ const asString = (value, label, max, required = true) => {
 
 const asOrder = (value, label) => {
   if (!Number.isFinite(value)) fail(`${label} must be a number`);
-  return Math.trunc(value);
+  const order = Math.trunc(value);
+  if (Math.abs(order) > MAX_ABS_ORDER) fail(`${label} is out of range`);
+  return order;
+};
+
+const validateMeta = (meta) => {
+  if (meta == null) return undefined;
+  const input = asObject(meta, '_meta');
+  if (!Number.isSafeInteger(input.updatedAt) || input.updatedAt <= 0) fail('_meta.updatedAt is invalid');
+  return { updatedAt: input.updatedAt };
+};
+
+const assertUniqueIds = (items, label) => {
+  const ids = new Set();
+  items.forEach((item) => {
+    if (ids.has(item.id)) fail(`${label} contains duplicate ids`);
+    ids.add(item.id);
+  });
+  return ids;
 };
 
 const asHttpUrl = (value, label, required = true) => {
@@ -114,11 +133,18 @@ const validateCard = (card, index) => {
 
 export const validatePublicData = (data) => {
   const input = asObject(data, 'publicData');
+  const categories = asArray(input.categories, 'categories', MAX_CATEGORIES).map(validateCategory);
+  const cards = asArray(input.cards, 'cards', MAX_CARDS).map(validateCard);
+  const categoryIds = assertUniqueIds(categories, 'categories');
+  assertUniqueIds(cards, 'cards');
+  cards.forEach((card) => {
+    if (!categoryIds.has(card.categoryId)) fail(`card ${card.id} references an unknown category`);
+  });
   return {
     settings: validateSettings(input.settings),
-    categories: asArray(input.categories, 'categories', MAX_CATEGORIES).map(validateCategory),
-    cards: asArray(input.cards, 'cards', MAX_CARDS).map(validateCard),
-    _meta: input._meta && typeof input._meta === 'object' ? input._meta : undefined
+    categories,
+    cards,
+    _meta: validateMeta(input._meta)
   };
 };
 
@@ -137,7 +163,7 @@ export const validatePrivateData = (data) => {
       username: asString(admin.username, 'admin.username', MAX_USERNAME_LENGTH),
       passwordHash
     },
-    _meta: input._meta && typeof input._meta === 'object' ? input._meta : undefined
+    _meta: validateMeta(input._meta)
   };
 };
 

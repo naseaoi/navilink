@@ -130,8 +130,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     return writeDataToStorage(mode, fileName, data);
   };
 
-  const writeCurrentDataBatch = async (entries) => {
-    const mode = await getStorageMode();
+  const writeDataBatchToStorage = async (mode, entries) => {
     const payloads = entries.map(({ fileName, data }) => ({ fileName, data: withTimestamp(fileName, data) }));
     if (mode === 'webdav') {
       const originals = Object.fromEntries(await Promise.all(
@@ -160,6 +159,11 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
       memoryCache[fileName] = data;
     });
     return Object.fromEntries(payloads.map(({ fileName, data }) => [fileName, data]));
+  };
+
+  const writeCurrentDataBatch = async (entries) => {
+    const mode = await getStorageMode();
+    return writeDataBatchToStorage(mode, entries);
   };
 
   const readPrivateOrDefault = async () => {
@@ -225,6 +229,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     writeDataToStorage,
     readCurrentData,
     writeCurrentData,
+    writeDataBatchToStorage,
     writeCurrentDataBatch,
     readPrivateOrDefault,
     readPublicOrDefault,

@@ -38,6 +38,31 @@ describe('validation helpers', () => {
     }), /http or https/);
   });
 
+  it('rejects duplicate ids', () => {
+    assert.throws(() => validateDataFilePayload('public.json', {
+      ...publicData,
+      cards: [publicData.cards[0], { ...publicData.cards[0] }]
+    }), /duplicate ids/);
+  });
+
+  it('rejects cards referencing unknown categories', () => {
+    assert.throws(() => validateDataFilePayload('public.json', {
+      ...publicData,
+      cards: [{ ...publicData.cards[0], categoryId: 'missing' }]
+    }), /unknown category/);
+  });
+
+  it('rejects invalid order and version values', () => {
+    assert.throws(() => validateDataFilePayload('public.json', {
+      ...publicData,
+      categories: [{ ...publicData.categories[0], order: Number.MAX_SAFE_INTEGER }]
+    }), /out of range/);
+    assert.throws(() => validateDataFilePayload('public.json', {
+      ...publicData,
+      _meta: { updatedAt: -1 }
+    }), /updatedAt is invalid/);
+  });
+
   it('rejects short new passwords', () => {
     assert.throws(() => validateDataFilePayload('private.json', {
       admin: { username: 'admin', passwordHash: 'short' }
