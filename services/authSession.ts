@@ -1,46 +1,32 @@
-export const AUTH_KEY = 'navilink_auth';
-export const AUTH_EXP_KEY = 'navilink_auth_exp';
-export const AUTH_FORCE_CHANGE_KEY = 'navilink_force_change_password';
+export interface AuthSession {
+  authenticated: boolean;
+  exp?: number;
+  mustChangePassword: boolean;
+}
 
-export const clearAuthSession = () => {
-  localStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem(AUTH_EXP_KEY);
-  localStorage.removeItem(AUTH_FORCE_CHANGE_KEY);
-};
+const requestSession = async (url: string) => fetch(url, {
+  method: 'GET',
+  credentials: 'same-origin'
+});
 
-export const hasValidAuthSession = () => {
-  const expiry = localStorage.getItem(AUTH_EXP_KEY);
-  if (!expiry) return false;
-  if (Date.now() > parseInt(expiry, 10)) {
-    clearAuthSession();
-    return false;
-  }
-  return true;
-};
-
-export const hasPasswordPolicyFlag = () => localStorage.getItem(AUTH_FORCE_CHANGE_KEY) === '1';
-
-export const saveAuthSession = (exp: number, mustChangePassword: boolean) => {
-  localStorage.setItem(AUTH_KEY, 'true');
-  localStorage.setItem(AUTH_EXP_KEY, String(exp));
-  if (mustChangePassword) localStorage.setItem(AUTH_FORCE_CHANGE_KEY, '1');
-  else localStorage.removeItem(AUTH_FORCE_CHANGE_KEY);
-};
-
-export const clearPasswordPolicyFlag = () => {
-  localStorage.removeItem(AUTH_FORCE_CHANGE_KEY);
+export const verifyAuthSession = async (): Promise<AuthSession> => {
+  let response = await requestSession('/api/auth/verify');
+  if (response.status === 404) response = await requestSession('/api/auth');
+  if (response.status === 401) return { authenticated: false, mustChangePassword: false };
+  if (!response.ok) throw new Error('Failed to verify auth session');
+  const payload: { exp?: number; mustChangePassword?: boolean } = await response.json();
+  return {
+    authenticated: true,
+    exp: payload.exp,
+    mustChangePassword: !!payload.mustChangePassword
+  };
 };
 
 export const logoutAuthSession = async () => {
-  clearAuthSession();
   try {
     const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
     if (!response.ok) throw new Error('Logout endpoint unavailable');
   } catch {
-    try {
-      await fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' });
-    } catch {
-      // ignore
-    }
+    await fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' });
   }
 };

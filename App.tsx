@@ -7,11 +7,8 @@ import { AdminLogin } from './components/admin/AdminLogin';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useTheme } from './hooks/useTheme';
 import {
-  clearAuthSession,
-  clearPasswordPolicyFlag,
-  hasPasswordPolicyFlag,
-  hasValidAuthSession,
-  logoutAuthSession
+  logoutAuthSession,
+  verifyAuthSession
 } from './services/authSession';
 import { webdav } from './services/webdavService';
 import { AppState, PrivateData } from './types';
@@ -25,8 +22,8 @@ const MainApp = () => {
     error: null
   });
   const [privateData, setPrivateData] = useState<PrivateData | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(hasValidAuthSession());
-  const [mustChangePassword, setMustChangePassword] = useState(hasPasswordPolicyFlag());
+  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'anonymous'>('checking');
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
   usePageMeta(state.publicData.settings.title, state.publicData.settings.icon);
@@ -46,30 +43,41 @@ const MainApp = () => {
   }, []);
 
   useEffect(() => {
+    const verifySession = async () => {
+      try {
+        const session = await verifyAuthSession();
+        setMustChangePassword(session.mustChangePassword);
+        setAuthState(session.authenticated ? 'authenticated' : 'anonymous');
+      } catch {
+        setAuthState('anonymous');
+      }
+    };
+    verifySession();
+  }, []);
+
+  useEffect(() => {
     const loadPrivate = async () => {
-      if (!isAuthenticated) return;
+      if (authState !== 'authenticated') return;
       try {
         const priv = await webdav.fetchPrivateData();
         setPrivateData(priv);
       } catch (e) {
-        clearAuthSession();
         setPrivateData(null);
-        setIsAuthenticated(false);
+        setAuthState('anonymous');
         setMustChangePassword(false);
       }
     };
     loadPrivate();
-  }, [isAuthenticated]);
+  }, [authState]);
 
   const handleLogout = async () => {
     await logoutAuthSession();
     setPrivateData(null);
-    setIsAuthenticated(false);
+    setAuthState('anonymous');
     setMustChangePassword(false);
   };
 
   const handlePasswordPolicyResolved = () => {
-    clearPasswordPolicyFlag();
     setMustChangePassword(false);
   };
 
@@ -80,7 +88,7 @@ const MainApp = () => {
         <Route path="/c/:categoryId" element={<CategoryPage />} />
       </Route>
       <Route path="/tat" element={
-        isAuthenticated ? (
+        authState === 'authenticated' ? (
           privateData ? (
             <Suspense fallback={null}>
               <AdminDashboard
@@ -96,12 +104,12 @@ const MainApp = () => {
           ) : (
             null
           )
-        ) : (
+        ) : authState === 'anonymous' ? (
           <AdminLogin onLogin={(nextMustChangePassword) => {
             setMustChangePassword(nextMustChangePassword);
-            setIsAuthenticated(true);
+            setAuthState('authenticated');
           }} />
-        )
+        ) : null
       } />
       <Route path="/admin" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

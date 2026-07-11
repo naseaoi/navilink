@@ -65,6 +65,7 @@ npm run lint
 npm run test
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
 
 ## 部署
@@ -201,13 +202,14 @@ navilink/
 ├── api/                   # Vercel Serverless Functions
 │   └── _shared/           # 后端共享鉴权、限流、数据和 WebDAV 工具
 ├── tests/                 # Node 单元测试和 Playwright E2E
+├── playwright.config.ts   # Chromium E2E 配置
 ├── data/                  # 运行时数据（gitignore）
 └── .github/workflows/     # CI/CD
 ```
 
 ## CI/CD
 
-- `.github/workflows/ci.yml`：安装依赖并执行 `npm run build`。
+- `.github/workflows/ci.yml`：执行生产构建和 Chromium E2E，失败时上传 Playwright 报告。
 - `.github/workflows/docker-image.yml`：构建并发布 GHCR Docker 镜像。
 
 ## License

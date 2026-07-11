@@ -1,4 +1,7 @@
 import { PublicData, PrivateData } from '../types';
+import { parsePublicData, readPublicDataCache } from './publicDataCache';
+
+const PUBLIC_CACHE_KEY = 'navilink_public';
 
 const DEFAULT_PUBLIC_DATA: PublicData = {
   settings: {
@@ -30,13 +33,6 @@ const DEFAULT_PUBLIC_DATA: PublicData = {
       order: 1
     }
   ]
-};
-
-const DEFAULT_PRIVATE_DATA: PrivateData = {
-  admin: {
-    username: "admin",
-    passwordHash: "admin123" 
-  }
 };
 
 class WebDavService {
@@ -91,63 +87,41 @@ class WebDavService {
 
   async fetchPublicData(): Promise<PublicData> {
     try {
-      // Use the Vercel API Proxy
       const response = await fetch('/api/webdav?file=public.json', {
         method: 'GET',
         credentials: 'same-origin'
       });
 
-      if (response.status === 404) {
-        // Init file if not exists
-        await this.savePublicData(DEFAULT_PUBLIC_DATA);
-        this.publicDataSource = 'default';
-        return DEFAULT_PUBLIC_DATA;
-      }
-      
-      if (!response.ok) {
-        // If API fails (e.g. local dev without API), fallback to LocalStorage Mock
-        console.warn("API unavailable, falling back to local storage");
-        const stored = localStorage.getItem('navilink_public');
-        if (stored) {
+      if (!response.ok) throw new Error(`Public data request failed: ${response.status}`);
+      const data = parsePublicData(await response.json());
+      localStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify(data));
+      this.publicDataSource = 'api';
+      return data;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        const cached = readPublicDataCache(PUBLIC_CACHE_KEY);
+        if (cached) {
           this.publicDataSource = 'localStorage';
-          return JSON.parse(stored);
+          return cached;
         }
         this.publicDataSource = 'default';
         return DEFAULT_PUBLIC_DATA;
       }
-      
-      this.publicDataSource = 'api';
-      return await response.json();
-    } catch (e) {
-      console.error("Fetch Error:", e);
-      const stored = localStorage.getItem('navilink_public');
-      if (stored) {
-        this.publicDataSource = 'localStorage';
-        return JSON.parse(stored);
-      }
-      this.publicDataSource = 'default';
-      return DEFAULT_PUBLIC_DATA;
+      throw error;
     }
   }
 
   async savePublicData(data: PublicData): Promise<void> {
-    try {
-      const response = await fetch('/api/webdav?file=public.json', {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      
-      if (!response.ok) throw new Error('Failed to save via API');
-    } catch (e) {
-      console.warn("API save failed, saving to local storage");
-      localStorage.setItem('navilink_public', JSON.stringify(data));
-      // Rethrow if you want the UI to know it failed on server
-      throw e;
-    }
+    const response = await fetch('/api/webdav?file=public.json', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to save via API');
+    localStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify(data));
   }
 
   async fetchPrivateData(): Promise<PrivateData> {
@@ -156,11 +130,6 @@ class WebDavService {
       credentials: 'same-origin'
     });
 
-    if (response.status === 404) {
-      await this.savePrivateData(DEFAULT_PRIVATE_DATA);
-      return DEFAULT_PRIVATE_DATA;
-    }
-    
     if (!response.ok) throw new Error('Failed to load private data');
 
     return await response.json();
@@ -210,7 +179,9 @@ class WebDavService {
     });
     if (response.status === 409) throw new Error('DATA_CONFLICT');
     if (!response.ok) throw new Error('Failed to save data');
-    return response.json();
+    const result: { publicData: PublicData; privateData: PrivateData } = await response.json();
+    localStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify(result.publicData));
+    return result;
   }
 }
 

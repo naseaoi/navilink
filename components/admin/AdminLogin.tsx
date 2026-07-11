@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { CheckSquare, Square } from 'lucide-react';
 import { Button, Input, PasswordInput } from '../UI';
-import { saveAuthSession } from '../../services/authSession';
 
 const loginCardClass =
   'w-full max-w-md rounded-3xl border border-[rgb(var(--border-subtle)/0.58)] bg-surface/95 p-8 shadow-popover dark:border-[rgb(var(--border-default)/0.36)] md:p-9';
@@ -28,8 +27,7 @@ export const AdminLogin: React.FC<{ onLogin: (mustChangePassword: boolean) => vo
       if (response.status === 404) response = await fetch('/api/auth', options);
 
       if (!response.ok) throw new Error('Invalid credentials');
-      const { exp, mustChangePassword } = await response.json();
-      saveAuthSession(exp, !!mustChangePassword);
+      const { mustChangePassword } = await response.json();
       onLogin(!!mustChangePassword);
     } catch (e) {
       setError('凭据无效');

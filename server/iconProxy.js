@@ -89,7 +89,11 @@ const assertSafeProxyUrl = async (targetUrl) => {
   return records[0];
 };
 
-const createPinnedLookup = (record) => (_hostname, _options, callback) => {
+const createPinnedLookup = (record) => (_hostname, options, callback) => {
+  if (options?.all) {
+    callback(null, [{ address: record.address, family: record.family }]);
+    return;
+  }
   callback(null, record.address, record.family);
 };
 
