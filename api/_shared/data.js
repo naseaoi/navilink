@@ -8,7 +8,9 @@ export const getRequestedDataFile = (file) => {
 
 export const withTimestamp = (fileName, data) => {
   if (!data || !ALLOWED_DATA_FILES.has(fileName)) return data;
-  return { ...data, _meta: { ...(data._meta || {}), updatedAt: Date.now() } };
+  const previousUpdatedAt = Number.isSafeInteger(data._meta?.updatedAt) ? data._meta.updatedAt : 0;
+  const updatedAt = Math.max(Date.now(), previousUpdatedAt + 1);
+  return { ...data, _meta: { ...(data._meta || {}), updatedAt } };
 };
 
 export const getUpdatedAt = (data) => {

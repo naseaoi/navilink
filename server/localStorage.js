@@ -1,8 +1,10 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
+import { randomUUID } from 'crypto';
 import { fetchWebDavJson, fetchWebDavJsonWithMeta, putWebDavJson, putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { getUpdatedAt, withTimestamp } from '../api/_shared/data.js';
+import { prepareSaveData } from '../api/_shared/saveData.js';
 
 export const createStorageService = ({
   dataDir,
@@ -28,6 +30,13 @@ export const createStorageService = ({
     ? parsedPublicCacheTtlMs
     : 15_000;
   let publicCacheExpiresAt = 0;
+  let writeQueue = Promise.resolve();
+
+  const runWrite = (operation) => {
+    const result = writeQueue.then(operation, operation);
+    writeQueue = result.then(() => undefined, () => undefined);
+    return result;
+  };
 
   const updateMemoryCache = (fileName, data) => {
     memoryCache[fileName] = data;
@@ -45,7 +54,7 @@ export const createStorageService = ({
   };
 
   const writeLocalJsonAtomic = async (filePath, data) => {
-    const tempPath = `${filePath}.tmp`;
+    const tempPath = `${filePath}.${randomUUID()}.tmp`;
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(tempPath, JSON.stringify(data, null, 2));
     await fs.rename(tempPath, filePath);
@@ -60,7 +69,7 @@ export const createStorageService = ({
   };
 
   const writeLocalJsonBatchAtomic = async (items) => {
-    const txId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const txId = randomUUID();
     const prepared = items.map(({ filePath, data }) => ({
       filePath,
       data,
@@ -116,50 +125,48 @@ export const createStorageService = ({
     return storageModeCache;
   };
 
-  const setStorageMode = async (mode) => {
-    storageModeCache = normalizeStorageMode(mode);
-    if (storageModeCache === 'webdav' && !useWebDav) storageModeCache = 'local';
+  const setStorageMode = (mode) => runWrite(async () => {
+    const nextMode = normalizeStorageMode(mode);
+    storageModeCache = nextMode === 'webdav' && !useWebDav ? 'local' : nextMode;
     await writeLocalJsonAtomic(storageConfigPath, { mode: storageModeCache });
     memoryCache['public.json'] = null;
     publicCacheExpiresAt = 0;
     return storageModeCache;
-  };
+  });
 
   const readDataFromStorage = async (mode, fileName) => {
     if (mode === 'webdav') return fetchWebDavJson(fileName);
     return readLocalJson(path.join(dataDir, fileName));
   };
 
-  const writeDataToStorage = async (mode, fileName, data) => {
+  const writeDataToStorageUnlocked = async (mode, fileName, data) => {
     const payload = withTimestamp(fileName, data);
     if (mode === 'webdav') {
       await putWebDavJson(fileName, payload);
-      return payload;
+    } else {
+      await writeLocalJsonAtomic(path.join(dataDir, fileName), payload);
     }
-    await writeLocalJsonAtomic(path.join(dataDir, fileName), payload);
     updateMemoryCache(fileName, payload);
     return payload;
   };
 
-  const readCurrentData = async (fileName) => {
-    const mode = await getStorageMode();
-    return readDataFromStorage(mode, fileName);
-  };
+  const writeDataToStorage = (mode, fileName, data) => runWrite(
+    () => writeDataToStorageUnlocked(mode, fileName, data)
+  );
 
-  const writeCurrentData = async (fileName, data) => {
+  const writeCurrentData = (fileName, data) => runWrite(async () => {
     const mode = await getStorageMode();
-    return writeDataToStorage(mode, fileName, data);
-  };
+    return writeDataToStorageUnlocked(mode, fileName, data);
+  });
 
-  const writeDataBatchToStorage = async (mode, entries) => {
+  const loadWebDavOriginals = async (entries) => Object.fromEntries(await Promise.all(
+    entries.map(async ({ fileName }) => [fileName, await fetchWebDavJsonWithMeta(fileName)])
+  ));
+
+  const writeDataBatchToStorageUnlocked = async (mode, entries, providedOriginals = null) => {
     const payloads = entries.map(({ fileName, data }) => ({ fileName, data: withTimestamp(fileName, data) }));
     if (mode === 'webdav') {
-      const originals = Object.fromEntries(await Promise.all(
-        payloads.map(async ({ fileName }) => {
-          const original = await fetchWebDavJsonWithMeta(fileName);
-          return [fileName, original];
-        })
-      ));
+      const originals = providedOriginals || await loadWebDavOriginals(payloads);
       await putWebDavJsonBatch({
         entries: payloads.map((payload) => ({
           ...payload,
@@ -182,10 +189,34 @@ export const createStorageService = ({
     return Object.fromEntries(payloads.map(({ fileName, data }) => [fileName, data]));
   };
 
-  const writeCurrentDataBatch = async (entries) => {
+  const writeDataBatchToStorage = (mode, entries) => runWrite(
+    () => writeDataBatchToStorageUnlocked(mode, entries)
+  );
+
+  const saveCurrentData = ({ publicData, privateData, expected }) => runWrite(async () => {
     const mode = await getStorageMode();
-    return writeDataBatchToStorage(mode, entries);
-  };
+    let currentPublic;
+    let currentPrivate;
+    let webDavOriginals = null;
+    if (mode === 'webdav') {
+      webDavOriginals = await loadWebDavOriginals([
+        { fileName: 'public.json' },
+        { fileName: 'private.json' }
+      ]);
+      currentPublic = webDavOriginals['public.json'].data;
+      currentPrivate = webDavOriginals['private.json'].data;
+    } else {
+      [currentPublic, currentPrivate] = await Promise.all([
+        readDataFromStorage(mode, 'public.json'),
+        readDataFromStorage(mode, 'private.json')
+      ]);
+    }
+    const prepared = prepareSaveData({ currentPublic, currentPrivate, publicData, privateData, expected });
+    return writeDataBatchToStorageUnlocked(mode, [
+      { fileName: 'public.json', data: prepared.publicData },
+      { fileName: 'private.json', data: prepared.privateData }
+    ], webDavOriginals);
+  });
 
   const readPrivateOrDefault = async () => {
     const mode = await getStorageMode();
@@ -236,8 +267,7 @@ export const createStorageService = ({
         return res.json(jsonData);
       }
       if (req.method === 'PUT') {
-        await writeLocalJsonAtomic(filePath, req.body);
-        updateMemoryCache(fileName, req.body);
+        await writeDataToStorage('local', fileName, req.body);
         return res.json({ success: true });
       }
       return res.status(405).json({ error: 'Method not allowed' });
@@ -252,14 +282,12 @@ export const createStorageService = ({
     setStorageMode,
     readDataFromStorage,
     writeDataToStorage,
-    readCurrentData,
     writeCurrentData,
     writeDataBatchToStorage,
-    writeCurrentDataBatch,
+    saveCurrentData,
     readPrivateOrDefault,
     readPublicOrDefault,
     readStatus,
-    handleLocalStorage,
-    updateMemoryCache
+    handleLocalStorage
   };
 };

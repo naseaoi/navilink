@@ -1,14 +1,14 @@
-import { getRequestedDataFile, withTimestamp } from '../api/_shared/data.js';
+import { getRequestedDataFile } from '../api/_shared/data.js';
 import { normalizePrivateData } from '../api/_shared/auth.js';
 import { proxyWebDavDataFile } from '../api/_shared/webdavProxy.js';
 import { validateDataFilePayload } from '../api/_shared/validation.js';
-import { prepareSaveData } from '../api/_shared/saveData.js';
 
 const sendValidationError = (res, error) => {
   if (error?.statusCode === 400 || error?.statusCode === 409) {
     return res.status(error.statusCode).json({ error: error.message, code: error.code });
   }
-  throw error;
+  console.error(`[Storage Error] ${error?.message || 'Unknown error'}`);
+  return res.status(500).json({ error: 'Storage Error' });
 };
 
 export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) => {
@@ -31,7 +31,15 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
       try {
         req.body = validateDataFilePayload(fileName, req.body);
         if (isPrivate) req.body = normalizePrivateData(req.body);
-        req.body = withTimestamp(fileName, req.body);
+      } catch (error) {
+        return sendValidationError(res, error);
+      }
+    }
+
+    if (isWrite) {
+      try {
+        await storage.writeCurrentData(fileName, req.body);
+        return res.json({ success: true });
       } catch (error) {
         return sendValidationError(res, error);
       }
@@ -43,9 +51,6 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
         const result = await proxyWebDavDataFile({ method: req.method, fileName, body: req.body });
         if (result.status === 404 && fileName === 'public.json') {
           return res.json(await storage.readPublicOrDefault());
-        }
-        if (isWrite && result.status >= 200 && result.status < 300) {
-          storage.updateMemoryCache(fileName, req.body);
         }
         if (result.json) return res.status(result.status).json(result.body);
         return res.status(result.status).send(result.body);
@@ -62,19 +67,11 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
     if (!payload) return;
 
     try {
-      const currentPublic = await storage.readCurrentData('public.json');
-      const currentPrivate = await storage.readCurrentData('private.json');
-      const prepared = prepareSaveData({
-        currentPublic,
-        currentPrivate,
+      const saved = await storage.saveCurrentData({
         publicData: req.body?.publicData,
         privateData: req.body?.privateData,
         expected: req.body?.expected
       });
-      const saved = await storage.writeCurrentDataBatch([
-        { fileName: 'public.json', data: prepared.publicData },
-        { fileName: 'private.json', data: prepared.privateData }
-      ]);
       return res.json({ publicData: saved['public.json'], privateData: saved['private.json'] });
     } catch (error) {
       return sendValidationError(res, error);
