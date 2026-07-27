@@ -34,7 +34,7 @@
 
 ## 最终验收
 
-- [ ] 所有待办已完成
-- [ ] `npm run build` 通过
-- [ ] `npm run test:e2e` 通过
-- [ ] 每个批次均有独立 Git 提交
+- [x] 所有待办已完成
+- [x] `npm run build` 通过
+- [x] `npm run test:e2e` 通过
+- [x] 每个批次均有独立 Git 提交
