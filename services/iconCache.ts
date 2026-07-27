@@ -9,9 +9,15 @@ const DB_VERSION = 1;
 const STORE_NAME = 'icons';
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天
 const MAX_ENTRIES = 500;
+const MAX_MEMORY_ENTRIES = 500;
 
-// 同会话内存级 LRU,避免重复创建 blob URL
-const memoryCache = new Map<string, string>();
+interface MemoryIcon {
+  src: string;
+  refCount: number;
+}
+
+const memoryCache = new Map<string, MemoryIcon>();
+const inFlight = new Map<string, Promise<string>>();
 
 interface IconRecord {
   url: string;          // 主键
@@ -117,31 +123,43 @@ const fetchAsBlob = async (url: string): Promise<{ blob: Blob; contentType: stri
   return { blob, contentType };
 };
 
-/**
- * 主入口:获取图标可用的 src(优先缓存,缺失则下载并入库)
- * 出错则抛出,由调用方触发降级链(Google favicon → 内置 SVG)
- */
-export const getCachedIconSrc = async (url: string, ttlMs = DEFAULT_TTL_MS): Promise<string> => {
-  if (!url) throw new Error('empty url');
+const enforceMemoryCapacity = () => {
+  if (memoryCache.size <= MAX_MEMORY_ENTRIES) return;
+  for (const [url, entry] of memoryCache) {
+    if (memoryCache.size <= MAX_MEMORY_ENTRIES) return;
+    if (entry.refCount > 0) continue;
+    URL.revokeObjectURL(entry.src);
+    memoryCache.delete(url);
+  }
+};
 
-  // 1. 内存命中
-  const mem = memoryCache.get(url);
-  if (mem) return mem;
+const storeMemoryIcon = (url: string, src: string) => {
+  memoryCache.set(url, { src, refCount: 0 });
+};
 
-  // 2. IndexedDB 命中且未过期
+const acquireMemoryIcon = (url: string): string | null => {
+  const entry = memoryCache.get(url);
+  if (!entry) return null;
+  entry.refCount += 1;
+  memoryCache.delete(url);
+  memoryCache.set(url, entry);
+  enforceMemoryCapacity();
+  return entry.src;
+};
+
+const loadIconSrc = async (url: string, ttlMs: number): Promise<string> => {
   try {
     const record = await readRecord(url);
     if (record && record.expiresAt > Date.now()) {
       const objectUrl = URL.createObjectURL(record.blob);
-      memoryCache.set(url, objectUrl);
+      storeMemoryIcon(url, objectUrl);
       touchRecord(record).catch(() => {});
       return objectUrl;
     }
   } catch {
-    // IndexedDB 不可用时退回直接 fetch
+    // 使用代理继续加载
   }
 
-  // 3. 远程拉取并入库
   const { blob, contentType } = await fetchAsBlob(url);
   const now = Date.now();
   const record: IconRecord = {
@@ -154,13 +172,39 @@ export const getCachedIconSrc = async (url: string, ttlMs = DEFAULT_TTL_MS): Pro
   };
   writeRecord(record).catch(() => {});
   const objectUrl = URL.createObjectURL(blob);
-  memoryCache.set(url, objectUrl);
+  storeMemoryIcon(url, objectUrl);
   return objectUrl;
+};
+
+export const getCachedIconSrc = async (url: string, ttlMs = DEFAULT_TTL_MS): Promise<string> => {
+  if (!url) throw new Error('empty url');
+  const cached = acquireMemoryIcon(url);
+  if (cached) return cached;
+
+  let pending = inFlight.get(url);
+  if (!pending) {
+    pending = loadIconSrc(url, ttlMs);
+    inFlight.set(url, pending);
+    pending.finally(() => {
+      if (inFlight.get(url) === pending) inFlight.delete(url);
+    }).catch(() => {});
+  }
+  await pending;
+  const loaded = acquireMemoryIcon(url);
+  if (!loaded) throw new Error('icon cache unavailable');
+  return loaded;
+};
+
+export const releaseCachedIconSrc = (url: string): void => {
+  const entry = memoryCache.get(url);
+  if (!entry) return;
+  entry.refCount = Math.max(0, entry.refCount - 1);
+  enforceMemoryCapacity();
 };
 
 /** 手动失效:管理后台「清空图标缓存」按钮可用 */
 export const clearIconCache = async (): Promise<void> => {
-  memoryCache.forEach((u) => URL.revokeObjectURL(u));
+  memoryCache.forEach((entry) => URL.revokeObjectURL(entry.src));
   memoryCache.clear();
   try {
     const store = await tx('readwrite');

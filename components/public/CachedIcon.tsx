@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getCachedIconSrc } from '../../services/iconCache';
+import { getCachedIconSrc, releaseCachedIconSrc } from '../../services/iconCache';
 
 /**
  * 统一的卡片图标组件
@@ -30,44 +30,64 @@ interface CachedIconProps {
 }
 
 export const CachedIcon: React.FC<CachedIconProps> = ({ icon, siteUrl, alt, className }) => {
-  // src 渲染源;fallbackStage 表示当前已尝试到的降级阶段
-  const [src, setSrc] = useState<string>(() => (icon && icon.trim() ? icon : FALLBACK_ICON));
+  const normalizedIcon = icon?.trim() || '';
+  const isInlineIcon = /^(data:|blob:)/i.test(normalizedIcon);
+  const [src, setSrc] = useState<string>(() => (isInlineIcon ? normalizedIcon : FALLBACK_ICON));
   const [fallbackStage, setFallbackStage] = useState<'origin' | 'favicon' | 'svg'>('origin');
-  const cancelledRef = useRef(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    cancelledRef.current = false;
-    const trimmed = icon && icon.trim();
+    setIsVisible(false);
+    if (!normalizedIcon || isInlineIcon) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setIsVisible(true);
+      observer.disconnect();
+    }, { rootMargin: '200px' });
+    if (imageRef.current) observer.observe(imageRef.current);
+    return () => observer.disconnect();
+  }, [isInlineIcon, normalizedIcon]);
 
-    // 没有图标 → 直接 fallback
-    if (!trimmed) {
+  useEffect(() => {
+    let cancelled = false;
+    let acquired = false;
+    if (!normalizedIcon) {
       setSrc(FALLBACK_ICON);
       setFallbackStage('svg');
       return;
     }
-
-    // data:/blob: 协议不入缓存,直接渲染
-    if (/^(data:|blob:)/i.test(trimmed)) {
-      setSrc(trimmed);
+    if (isInlineIcon) {
+      setSrc(normalizedIcon);
       setFallbackStage('origin');
       return;
     }
-
+    setSrc(FALLBACK_ICON);
     setFallbackStage('origin');
+    if (!isVisible) return;
 
-    // 异步走缓存。失败不影响渲染:回退到原始 URL,由 onError 触发降级
-    getCachedIconSrc(trimmed)
+    getCachedIconSrc(normalizedIcon)
       .then((cachedSrc) => {
-        if (!cancelledRef.current) setSrc(cachedSrc);
+        acquired = true;
+        if (cancelled) {
+          releaseCachedIconSrc(normalizedIcon);
+          return;
+        }
+        setSrc(cachedSrc);
       })
       .catch(() => {
-        if (!cancelledRef.current) setSrc(trimmed);
+        if (!cancelled) setSrc(normalizedIcon);
       });
 
     return () => {
-      cancelledRef.current = true;
+      cancelled = true;
+      if (acquired) releaseCachedIconSrc(normalizedIcon);
     };
-  }, [icon]);
+  }, [isInlineIcon, isVisible, normalizedIcon]);
 
   const handleError = () => {
     if (fallbackStage === 'origin') {
@@ -89,6 +109,7 @@ export const CachedIcon: React.FC<CachedIconProps> = ({ icon, siteUrl, alt, clas
 
   return (
     <img
+      ref={imageRef}
       src={src}
       alt={alt || ''}
       className={className}
