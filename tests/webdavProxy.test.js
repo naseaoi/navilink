@@ -76,7 +76,7 @@ describe('webdav proxy', () => {
   it('rolls back committed files when batch write fails', async () => {
     const calls = [];
     const responses = [
-      { status: 204, ok: true },
+      new Response(null, { status: 204, headers: { ETag: '"committed-public"' } }),
       { status: 500, ok: false },
       { status: 204, ok: true }
     ];
@@ -102,12 +102,13 @@ describe('webdav proxy', () => {
     assert.match(calls[1][0], /private\.json$/);
     assert.match(calls[2][0], /public\.json$/);
     assert.equal(calls[2][1].body, JSON.stringify({ version: 'old-public' }));
+    assert.equal(calls[2][1].headers['If-Match'], '"committed-public"');
   });
 
   it('deletes new files during batch rollback', async () => {
     const calls = [];
     const responses = [
-      { status: 204, ok: true },
+      new Response(null, { status: 204, headers: { ETag: '"created-public"' } }),
       { status: 500, ok: false },
       { status: 204, ok: true }
     ];
@@ -131,6 +132,37 @@ describe('webdav proxy', () => {
     assert.equal(calls.length, 3);
     assert.match(calls[2][0], /public\.json$/);
     assert.equal(calls[2][1].method, 'DELETE');
+    assert.equal(calls[2][1].headers['If-Match'], '"created-public"');
+  });
+
+  it('does not perform an unsafe rollback without a committed ETag', async () => {
+    const calls = [];
+    const errors = [];
+    const responses = [
+      { status: 204, ok: true },
+      { status: 500, ok: false }
+    ];
+    global.fetch = async (...args) => {
+      calls.push(args);
+      return responses.shift();
+    };
+    const originalConsoleError = console.error;
+    console.error = (message) => errors.push(message);
+    try {
+      await assert.rejects(() => putWebDavJsonBatch({
+        entries: [
+          { fileName: 'public.json', data: { version: 'next-public' } },
+          { fileName: 'private.json', data: { version: 'next-private' } }
+        ],
+        originals: { 'public.json': { version: 'old-public' } },
+        env
+      }), /WebDAV write failed: 500/);
+    } finally {
+      console.error = originalConsoleError;
+    }
+
+    assert.equal(calls.length, 2);
+    assert.match(errors[0], /missing committed ETag/);
   });
 
   it('uses conditional headers for batch writes', async () => {

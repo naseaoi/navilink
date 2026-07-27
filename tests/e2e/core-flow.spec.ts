@@ -23,7 +23,34 @@ test.describe.serial('核心流程', () => {
     expect((await compressedAsset).headers()['content-encoding']).toMatch(/^(br|gzip)$/);
     const health = await page.request.get('/healthz');
     expect(health.ok()).toBe(true);
+    expect(health.headers()['cache-control']).toBe('no-store');
     expect(await health.json()).toEqual({ ok: true });
+  });
+
+  test('相同图标只发起一次代理请求', async ({ page }) => {
+    const sharedIcon = 'https://assets.example.com/shared-icon.png';
+    const publicData = {
+      settings: { title: '图标请求测试', icon: '' },
+      categories: [{ id: 'shared', name: '共享图标', order: 0 }],
+      cards: [
+        { id: 'one', categoryId: 'shared', title: '站点一', description: '', url: 'https://one.example.com', icon: sharedIcon, order: 0 },
+        { id: 'two', categoryId: 'shared', title: '站点二', description: '', url: 'https://two.example.com', icon: sharedIcon, order: 1 }
+      ],
+      _meta: { updatedAt: 1 }
+    };
+    const requestedIcons: string[] = [];
+    await page.route((url) => url.pathname === '/api/webdav' && url.searchParams.get('file') === 'public.json', (route) => (
+      route.fulfill({ json: publicData })
+    ));
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.pathname === '/api/icon-proxy') requestedIcons.push(url.searchParams.get('url') || '');
+    });
+
+    await page.goto('/');
+    await expect(page.getByText('站点一', { exact: true })).toBeVisible();
+    await expect(page.getByText('站点二', { exact: true })).toBeVisible();
+    await expect.poll(() => requestedIcons.filter((url) => url === sharedIcon).length).toBe(1);
   });
 
   test('默认密码登录后必须修改密码', async ({ page }) => {
@@ -36,6 +63,54 @@ test.describe.serial('核心流程', () => {
     await page.getByTitle('保存更改').click();
     await expect(page.getByText('设置保存成功', { exact: true })).toBeVisible();
     await expect(page.getByText('当前账号仍在使用默认密码', { exact: false })).toHaveCount(0);
+  });
+
+  test('切换存储模式时接受所选存储的旧版本数据', async ({ page }) => {
+    const cachedData = {
+      settings: { title: '浏览器缓存版本', icon: '' },
+      categories: [{ id: 'cached', name: '缓存分类', order: 0 }],
+      cards: [],
+      _meta: { updatedAt: 200 }
+    };
+    const webdavData = {
+      settings: { title: 'WebDAV 旧版本', icon: '' },
+      categories: [{ id: 'webdav', name: 'WebDAV 分类', order: 0 }],
+      cards: [],
+      _meta: { updatedAt: 100 }
+    };
+    let freshPublicReads = 0;
+    await page.addInitScript((data) => {
+      localStorage.setItem('navilink_public', JSON.stringify(data));
+    }, cachedData);
+    await page.route((url) => url.pathname === '/api/webdav' && url.searchParams.get('file') === 'public.json', (route) => {
+      if (new URL(route.request().url()).searchParams.get('fresh') === '1') freshPublicReads += 1;
+      return route.fulfill({ json: webdavData });
+    });
+    await page.route('**/api/storage/mode', (route) => route.fulfill({
+      json: {
+        mode: route.request().method() === 'PUT' ? 'webdav' : 'local',
+        available: { local: true, webdav: true }
+      }
+    }));
+    await page.route('**/api/storage/status', (route) => route.fulfill({
+      json: {
+        local: { publicUpdatedAt: 200, privateUpdatedAt: 200 },
+        webdav: { publicUpdatedAt: 100, privateUpdatedAt: 100 },
+        available: { local: true, webdav: true }
+      }
+    }));
+
+    await page.goto('/tat');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('e2e-password-123');
+    await page.getByRole('button', { name: '登录', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '卡片管理', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '数据存储', exact: true }).click();
+    await page.getByRole('button', { name: '本地存储', exact: true }).click();
+    await page.getByRole('button', { name: 'WebDAV', exact: true }).click();
+
+    await expect(page).toHaveTitle('WebDAV 旧版本');
+    expect(freshPublicReads).toBe(1);
   });
 
   test('新增卡片保存后重新加载仍存在', async ({ page }) => {

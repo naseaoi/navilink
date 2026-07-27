@@ -45,13 +45,19 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
       }
     }
 
+    if (!isPrivate) {
+      try {
+        return res.json(await storage.readPublicOrDefault());
+      } catch (error) {
+        console.error(`[Storage Read Error] ${error.message}`);
+        return res.status(500).json({ error: 'Storage Read Error' });
+      }
+    }
+
     const storageMode = await storage.getStorageMode();
     if (storageMode === 'webdav') {
       try {
         const result = await proxyWebDavDataFile({ method: req.method, fileName, body: req.body });
-        if (result.status === 404 && fileName === 'public.json') {
-          return res.json(await storage.readPublicOrDefault());
-        }
         if (result.json) return res.status(result.status).json(result.body);
         return res.status(result.status).send(result.body);
       } catch (error) {

@@ -89,19 +89,23 @@ class WebDavService {
     return response.json();
   }
 
-  async fetchPublicData(): Promise<PublicData> {
+  async fetchPublicData({ forceRefresh = false }: { forceRefresh?: boolean } = {}): Promise<PublicData> {
     const cached = readPublicDataCache(PUBLIC_CACHE_KEY);
     try {
-      const response = await fetch('/api/webdav?file=public.json', {
+      const endpoint = forceRefresh
+        ? '/api/webdav?file=public.json&fresh=1'
+        : '/api/webdav?file=public.json';
+      const response = await fetch(endpoint, {
         method: 'GET',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        cache: forceRefresh ? 'no-store' : 'default'
       });
 
       if (!response.ok) throw new Error(`Public data request failed: ${response.status}`);
       const data = parsePublicData(await response.json());
       const cachedVersion = cached?._meta?.updatedAt ?? 0;
       const remoteVersion = data._meta?.updatedAt ?? 0;
-      if (cached && cachedVersion > remoteVersion) {
+      if (!forceRefresh && cached && cachedVersion > remoteVersion) {
         this.publicDataSource = 'localStorage';
         return cached;
       }

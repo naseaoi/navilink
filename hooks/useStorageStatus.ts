@@ -36,7 +36,7 @@ export const useStorageStatus = ({
 
   const refreshRemoteData = useCallback(async () => {
     const [publicData, privateData] = await Promise.all([
-      webdav.fetchPublicData(),
+      webdav.fetchPublicData({ forceRefresh: true }),
       webdav.fetchPrivateData()
     ]);
     replaceDraft(publicData, privateData);

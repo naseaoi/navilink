@@ -20,12 +20,12 @@ ENV PORT=3000
 
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-RUN mkdir -p ./data && chown -R node:node /app
+RUN mkdir -p ./data && chown node:node ./data
 
-COPY --chown=node:node --from=builder /app/dist ./dist
-COPY --chown=node:node --from=builder /app/server.js ./server.js
-COPY --chown=node:node --from=builder /app/server ./server
-COPY --chown=node:node --from=builder /app/api/_shared ./api/_shared
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/server ./server
+COPY --from=builder /app/api/_shared ./api/_shared
 
 EXPOSE 3000
 USER node

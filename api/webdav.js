@@ -4,7 +4,7 @@ import { getRequestedDataFile, withTimestamp } from './_shared/data.js';
 import { hasWebDavConfig, putWebDavJson } from './_shared/webdav.js';
 import { proxyWebDavDataFile } from './_shared/webdavProxy.js';
 import { validateDataFilePayload } from './_shared/validation.js';
-import { getPublicDataCacheControl } from './_shared/httpCache.js';
+import { getPublicDataCacheControl, isCacheablePublicDataRequest } from './_shared/httpCache.js';
 
 export default async function handler(request, response) {
   const { AUTH_SECRET } = process.env;
@@ -26,7 +26,12 @@ export default async function handler(request, response) {
   const isPrivate = fileName === 'private.json';
   const isWrite = request.method === 'PUT';
 
-  response.setHeader('Cache-Control', !isPrivate && !isWrite ? getPublicDataCacheControl() : 'no-store');
+  const isCacheablePublicRead = isCacheablePublicDataRequest({
+    method: request.method,
+    file,
+    fresh: request.query.fresh
+  });
+  response.setHeader('Cache-Control', isCacheablePublicRead ? getPublicDataCacheControl() : 'no-store');
 
   if (isPrivate || isWrite) {
     if (!AUTH_SECRET) return response.status(500).json({ error: 'AUTH_SECRET is missing.' });

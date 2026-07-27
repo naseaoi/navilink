@@ -110,13 +110,16 @@ export const putWebDavJson = async (fileName, data, env = process.env, options =
     response = await fetchWebDav(targetUrl, fetchOptions, env);
   }
   if (!response.ok) throw createWebDavError(`WebDAV write failed: ${response.status}`, response.status);
+  return { etag: response.headers?.get?.('etag') || null };
 };
 
-export const deleteWebDavFile = async (fileName, env = process.env) => {
+export const deleteWebDavFile = async (fileName, env = process.env, options = {}) => {
   const { targetUrl } = buildWebDavUrls(fileName, env);
+  const headers = { Authorization: getWebDavAuthHeader(env) };
+  if (options.ifMatch) headers['If-Match'] = options.ifMatch;
   const response = await fetchWebDav(targetUrl, {
     method: 'DELETE',
-    headers: { Authorization: getWebDavAuthHeader(env) }
+    headers
   }, env);
   if (response.status === 404) return;
   if (!response.ok) throw createWebDavError(`WebDAV delete failed: ${response.status}`, response.status);
@@ -126,20 +129,24 @@ export const putWebDavJsonBatch = async ({ entries, originals = {}, env = proces
   const committed = [];
   try {
     for (const entry of entries) {
-      await putWebDavJson(entry.fileName, entry.data, env, {
+      const result = await putWebDavJson(entry.fileName, entry.data, env, {
         ifMatch: entry.ifMatch,
         ifNoneMatch: entry.ifNoneMatch
       });
-      committed.push(entry.fileName);
+      committed.push({ fileName: entry.fileName, etag: result.etag });
     }
   } catch (error) {
-    for (const fileName of committed.reverse()) {
+    for (const { fileName, etag } of committed.reverse()) {
       const original = originals[fileName];
       try {
+        if (!etag) {
+          console.error(`[WebDAV Rollback Error] ${fileName}: missing committed ETag`);
+          continue;
+        }
         if (original) {
-          await putWebDavJson(fileName, original, env);
+          await putWebDavJson(fileName, original, env, { ifMatch: etag });
         } else if (Object.hasOwn(originals, fileName)) {
-          await deleteWebDavFile(fileName, env);
+          await deleteWebDavFile(fileName, env, { ifMatch: etag });
         }
       } catch (rollbackError) {
         console.error(`[WebDAV Rollback Error] ${fileName}: ${rollbackError.message}`);

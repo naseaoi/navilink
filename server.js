@@ -10,10 +10,11 @@ import { createDefaultPrivateData } from './api/_shared/auth.js';
 import { createDefaultPublicData } from './api/_shared/defaultData.js';
 import { createLoginRateLimiter } from './api/_shared/rateLimit.js';
 import { hasWebDavConfig } from './api/_shared/webdav.js';
-import { getPublicDataCacheControl } from './api/_shared/httpCache.js';
+import { getPublicDataCacheControl, isCacheablePublicDataRequest } from './api/_shared/httpCache.js';
 import { registerAuthRoutes, createRequireAuth } from './server/authRoutes.js';
 import { createIconProxyHandler } from './server/iconProxy.js';
 import { createStorageService } from './server/localStorage.js';
+import { createShutdownHandler } from './server/shutdown.js';
 import { registerStorageRoutes } from './server/storageRoutes.js';
 
 // 配置环境
@@ -68,9 +69,11 @@ app.use((_req, res, next) => {
 });
 app.use(express.json({ limit: '10mb' })); // 支持大 JSON 数据
 app.use('/api', (req, res, next) => {
-  const isPublicDataRead = req.method === 'GET'
-    && req.path === '/webdav'
-    && (req.query.file === undefined || req.query.file === 'public.json');
+  const isPublicDataRead = req.path === '/webdav' && isCacheablePublicDataRequest({
+    method: req.method,
+    file: req.query.file,
+    fresh: req.query.fresh
+  });
   res.set('Cache-Control', isPublicDataRead ? getPublicDataCacheControl() : 'no-store');
   return next();
 });
@@ -152,18 +155,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   });
 });
 
-let isShuttingDown = false;
-const shutdown = (signal) => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-  console.log(`[System] Received ${signal}, shutting down`);
-  const forceExitTimer = setTimeout(() => process.exit(1), 10_000);
-  forceExitTimer.unref();
-  server.close((error) => {
-    clearTimeout(forceExitTimer);
-    process.exit(error ? 1 : 0);
-  });
-};
+const shutdown = createShutdownHandler({ server });
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));

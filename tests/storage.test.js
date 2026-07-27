@@ -74,6 +74,47 @@ describe('storage initialization', () => {
     }
   });
 
+  it('caches public reads in WebDAV mode', async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'navilink-webdav-cache-'));
+    const originalFetch = global.fetch;
+    const previousWebDavEnv = {
+      WEBDAV_URL: process.env.WEBDAV_URL,
+      WEBDAV_USERNAME: process.env.WEBDAV_USERNAME,
+      WEBDAV_PASSWORD: process.env.WEBDAV_PASSWORD
+    };
+    process.env.WEBDAV_URL = 'https://dav.example.com';
+    process.env.WEBDAV_USERNAME = 'test';
+    process.env.WEBDAV_PASSWORD = 'test';
+    let reads = 0;
+    global.fetch = async () => {
+      reads += 1;
+      return new Response(JSON.stringify({ ...createDefaultPublicData(), _meta: { updatedAt: 10 } }), {
+        status: 200,
+        headers: { ETag: '"public-v1"' }
+      });
+    };
+    try {
+      const storage = createStorageService({
+        dataDir,
+        storageConfigPath: path.join(dataDir, 'storage.json'),
+        useWebDav: true,
+        defaultPublicData: createDefaultPublicData(),
+        defaultPrivateData: { admin: { username: 'admin', passwordHash: 'unused' } },
+        publicCacheTtlMs: 60_000
+      });
+      await storage.readPublicOrDefault();
+      await storage.readPublicOrDefault();
+      assert.equal(reads, 1);
+    } finally {
+      global.fetch = originalFetch;
+      Object.entries(previousWebDavEnv).forEach(([key, value]) => {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      });
+      await fs.rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('allows only one concurrent save for the same local version', async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'navilink-concurrent-'));
     try {
