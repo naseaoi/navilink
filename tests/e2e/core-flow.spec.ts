@@ -35,11 +35,20 @@ test.describe.serial('核心流程', () => {
   });
 
   test('新增卡片保存后重新加载仍存在', async ({ page }) => {
+    const storageRequests: string[] = [];
+    page.on('request', (request) => {
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith('/api/storage/')) storageRequests.push(path);
+    });
     await page.goto('/tat');
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码').fill('e2e-password-123');
     await page.getByRole('button', { name: '登录', exact: true }).click();
     await expect(page.getByRole('heading', { name: '卡片管理', exact: true })).toBeVisible();
+    expect(storageRequests).toHaveLength(0);
+    await page.getByRole('button', { name: '数据存储', exact: true }).click();
+    await expect.poll(() => storageRequests.length).toBe(2);
+    await page.getByRole('button', { name: '卡片管理', exact: true }).click();
     await page.getByTitle('新增卡片').click();
     await page.getByLabel('显示名称').fill('E2E 示例');
     await page.getByLabel('目标 URL').fill('https://example.com/e2e');

@@ -19,8 +19,10 @@ export default async function handler(request, response) {
 
   try {
     const env = getWebDavEnv({ WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH });
-    const currentPublic = await fetchWebDavJsonWithMeta('public.json', env);
-    const currentPrivate = await fetchWebDavJsonWithMeta('private.json', env);
+    const [currentPublic, currentPrivate] = await Promise.all([
+      fetchWebDavJsonWithMeta('public.json', env),
+      fetchWebDavJsonWithMeta('private.json', env)
+    ]);
     const prepared = prepareSaveData({
       currentPublic: currentPublic.data,
       currentPrivate: currentPrivate.data,

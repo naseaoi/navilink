@@ -12,6 +12,7 @@ interface StorageStatus {
 }
 
 export const useStorageStatus = ({
+  enabled,
   showToast,
   hasChanges,
   confirm,
@@ -19,6 +20,7 @@ export const useStorageStatus = ({
   onUpdatePublic,
   onUpdatePrivate
 }: {
+  enabled: boolean;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   hasChanges: boolean;
   confirm: (title: string, message: string, onConfirm: () => void, variant?: 'danger' | 'primary') => void;
@@ -33,36 +35,42 @@ export const useStorageStatus = ({
   const [syncing, setSyncing] = useState<SyncDirection>('none');
 
   const refreshRemoteData = useCallback(async () => {
-    const publicData = await webdav.fetchPublicData();
-    const privateData = await webdav.fetchPrivateData();
+    const [publicData, privateData] = await Promise.all([
+      webdav.fetchPublicData(),
+      webdav.fetchPrivateData()
+    ]);
     replaceDraft(publicData, privateData);
     onUpdatePublic(publicData);
     onUpdatePrivate(privateData);
   }, [onUpdatePrivate, onUpdatePublic, replaceDraft]);
 
   const refreshStorageStatus = useCallback(async () => {
+    if (!enabled) return;
     try {
       const status = await webdav.getStorageStatus();
       setStorageStatus(status);
     } catch (error) {
       showToast('获取存储状态失败', 'error');
     }
-  }, [showToast]);
+  }, [enabled, showToast]);
 
   useEffect(() => {
     const loadStorage = async () => {
+      if (!enabled) return;
       try {
-        const info = await webdav.getStorageMode();
+        const [info, status] = await Promise.all([
+          webdav.getStorageMode(),
+          webdav.getStorageStatus()
+        ]);
         setStorageMode(info.mode);
         setStorageAvailable(info.available);
-        const status = await webdav.getStorageStatus();
         setStorageStatus(status);
       } catch (error) {
         showToast('获取存储信息失败', 'error');
       }
     };
     loadStorage();
-  }, [showToast]);
+  }, [enabled, showToast]);
 
   const handleStorageModeChange = useCallback(async (mode: StorageMode) => {
     const changeMode = async () => {
@@ -71,8 +79,7 @@ export const useStorageStatus = ({
         const info = await webdav.setStorageMode(mode);
         setStorageMode(info.mode);
         setStorageAvailable(info.available);
-        await refreshRemoteData();
-        await refreshStorageStatus();
+        await Promise.all([refreshRemoteData(), refreshStorageStatus()]);
         showToast('存储模式已切换', 'success');
       } catch (error) {
         showToast('切换存储模式失败', 'error');
@@ -99,8 +106,7 @@ export const useStorageStatus = ({
         setSyncing(from === 'webdav' ? 'webdavToLocal' : 'localToWebdav');
         try {
           await webdav.syncStorage(from, to);
-          await refreshRemoteData();
-          await refreshStorageStatus();
+          await Promise.all([refreshRemoteData(), refreshStorageStatus()]);
           showToast('数据同步完成', 'success');
         } catch (error) {
           showToast('数据同步失败', 'error');

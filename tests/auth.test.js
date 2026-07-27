@@ -14,6 +14,7 @@ import {
 import { loginAdmin } from '../api/_shared/authService.js';
 import { createLoginRateLimiter } from '../api/_shared/rateLimit.js';
 import { changeAdminPassword } from '../api/_shared/passwordService.js';
+import { registerAuthRoutes } from '../server/authRoutes.js';
 
 const createRequest = () => ({ headers: {}, ip: '127.0.0.1' });
 
@@ -27,6 +28,10 @@ const createResponse = () => ({
   },
   setHeader(name, value) {
     this.headers[name] = value;
+  },
+  set(name, value) {
+    this.headers[name] = value;
+    return this;
   },
   json(body) {
     this.body = body;
@@ -91,15 +96,31 @@ describe('auth helpers', () => {
     process.env.AUTH_SECRET = 'endpoint-secret';
     try {
       const token = signToken({ username: 'admin', exp: Date.now() + 60_000 }, 'endpoint-secret');
+      const routes = {};
+      const app = {
+        get: (path, handler) => { routes[`GET ${path}`] = handler; },
+        post: (path, handler) => { routes[`POST ${path}`] = handler; }
+      };
+      registerAuthRoutes({ app, authSecret: 'endpoint-secret', loginRateLimiter: {}, storage: {} });
+
       const verifyResponse = createResponse();
-      await verifyHandler({ method: 'GET', headers: { cookie: `navilink_session=${token}` } }, verifyResponse);
+      const verifyRequest = { method: 'GET', headers: { cookie: `navilink_session=${token}` } };
+      await verifyHandler(verifyRequest, verifyResponse);
       assert.equal(verifyResponse.statusCode, 200);
       assert.equal(verifyResponse.body.ok, true);
+      const expressVerifyResponse = createResponse();
+      await routes['GET /api/auth/verify'](verifyRequest, expressVerifyResponse);
+      assert.deepEqual(expressVerifyResponse.body, verifyResponse.body);
+      assert.equal(expressVerifyResponse.statusCode, verifyResponse.statusCode);
 
       const logoutResponse = createResponse();
       await logoutHandler({ method: 'POST', headers: {} }, logoutResponse);
       assert.equal(logoutResponse.statusCode, 200);
       assert.match(logoutResponse.headers['Set-Cookie'], /Max-Age=0/);
+      const expressLogoutResponse = createResponse();
+      await routes['POST /api/auth/logout']({}, expressLogoutResponse);
+      assert.deepEqual(expressLogoutResponse.body, logoutResponse.body);
+      assert.equal(expressLogoutResponse.headers['Set-Cookie'], logoutResponse.headers['Set-Cookie']);
     } finally {
       if (previousSecret === undefined) delete process.env.AUTH_SECRET;
       else process.env.AUTH_SECRET = previousSecret;

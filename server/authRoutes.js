@@ -1,8 +1,5 @@
-import {
-  buildClearAuthCookie,
-  getAuthToken,
-  verifyToken
-} from '../api/_shared/auth.js';
+import { getAuthToken, verifyToken } from '../api/_shared/auth.js';
+import { logoutAuthRequest, verifyAuthRequest } from '../api/_shared/authEndpoints.js';
 import { loginAdmin } from '../api/_shared/authService.js';
 import { changeAdminPassword } from '../api/_shared/passwordService.js';
 
@@ -49,8 +46,7 @@ export const registerAuthRoutes = ({ app, authSecret, loginRateLimiter, storage 
   });
 
   app.post('/api/auth/logout', (_req, res) => {
-    res.set('Set-Cookie', buildClearAuthCookie());
-    return res.json({ ok: true });
+    return sendAuthResult(res, logoutAuthRequest());
   });
 
   app.post('/api/auth/password', async (req, res) => {
@@ -73,9 +69,6 @@ export const registerAuthRoutes = ({ app, authSecret, loginRateLimiter, storage 
   });
 
   app.get('/api/auth/verify', (req, res) => {
-    const token = getAuthToken(req);
-    const payload = verifyToken(token, authSecret);
-    if (!payload) return res.status(401).json({ ok: false });
-    return res.json({ ok: true, exp: payload.exp, mustChangePassword: !!payload.mustChangePassword });
+    return sendAuthResult(res, verifyAuthRequest(req, authSecret));
   });
 };

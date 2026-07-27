@@ -59,6 +59,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
     handleStorageModeChange,
     handleStorageSync
   } = useStorageStatus({
+    enabled: activeTab === 'storage',
     showToast,
     hasChanges,
     confirm,

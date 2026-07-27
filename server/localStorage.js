@@ -240,14 +240,12 @@ export const createStorageService = ({
   };
 
   const readStatus = async () => {
-    const localPublic = await readDataFromStorage('local', 'public.json');
-    const localPrivate = await readDataFromStorage('local', 'private.json');
-    let webdavPublic = null;
-    let webdavPrivate = null;
-    if (useWebDav) {
-      webdavPublic = await readDataFromStorage('webdav', 'public.json');
-      webdavPrivate = await readDataFromStorage('webdav', 'private.json');
-    }
+    const [localPublic, localPrivate, webdavPublic, webdavPrivate] = await Promise.all([
+      readDataFromStorage('local', 'public.json'),
+      readDataFromStorage('local', 'private.json'),
+      useWebDav ? readDataFromStorage('webdav', 'public.json') : null,
+      useWebDav ? readDataFromStorage('webdav', 'private.json') : null
+    ]);
     return {
       local: { publicUpdatedAt: getUpdatedAt(localPublic), privateUpdatedAt: getUpdatedAt(localPrivate) },
       webdav: { publicUpdatedAt: getUpdatedAt(webdavPublic), privateUpdatedAt: getUpdatedAt(webdavPrivate) },
