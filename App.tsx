@@ -20,7 +20,7 @@ const EMPTY_PUBLIC_DATA = { settings: { title: 'NaviLink', icon: '' }, categorie
 const createInitialState = (): AppState => {
   const cached = webdav.getCachedPublicData();
   return cached
-    ? { publicData: cached, hasFetchedPublicData: true, error: '正在使用本地缓存' }
+    ? { publicData: cached, hasFetchedPublicData: true, error: null }
     : { publicData: EMPTY_PUBLIC_DATA, hasFetchedPublicData: false, error: null };
 };
 

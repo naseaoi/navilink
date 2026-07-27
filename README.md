@@ -93,7 +93,7 @@ docker run -d \
   ghcr.io/<your-username>/navilink:latest
 ```
 
-容器使用 UID/GID `1000` 的非 root 用户运行。绑定宿主机目录前，请确保 `/opt/navilink/data` 对 UID `1000` 可写。容器健康检查访问 `/healthz`。
+发布镜像支持 `linux/amd64` 和 `linux/arm64`。容器使用 UID/GID `1000` 的非 root 用户运行。绑定宿主机目录前，请确保 `/opt/navilink/data` 对 UID `1000` 可写。容器健康检查访问 `/healthz`。
 
 如需 WebDAV 模式，追加环境变量：
 

@@ -27,6 +27,49 @@ test.describe.serial('核心流程', () => {
     expect(await health.json()).toEqual({ ok: true });
   });
 
+  test('缓存降级提示悬浮显示且不移动首页布局', async ({ page }) => {
+    const cachedData = {
+      settings: { title: '缓存首页', icon: '' },
+      categories: [{ id: 'cached', name: '缓存分类', order: 0 }],
+      cards: [],
+      _meta: { updatedAt: 10 }
+    };
+    let releaseRemoteRequest = () => {};
+    let markRemoteRequested = () => {};
+    const remoteGate = new Promise<void>((resolve) => { releaseRemoteRequest = resolve; });
+    const remoteRequested = new Promise<void>((resolve) => { markRemoteRequested = resolve; });
+    await page.addInitScript((data) => {
+      localStorage.setItem('navilink_public', JSON.stringify(data));
+    }, cachedData);
+    await page.route((url) => url.pathname === '/api/webdav' && url.searchParams.get('file') === 'public.json', async (route) => {
+      markRemoteRequested();
+      await remoteGate;
+      await route.fulfill({ status: 503, json: { error: 'unavailable' } });
+    });
+
+    await page.goto('/');
+    await remoteRequested;
+    const hero = page.getByRole('heading', { name: 'Hello.' });
+    await expect(hero).toBeVisible();
+    await expect(page.getByText('正在使用本地缓存', { exact: true })).toHaveCount(0);
+    const before = await hero.boundingBox();
+
+    releaseRemoteRequest();
+    await expect(page.getByRole('status')).toHaveText('正在使用本地缓存');
+    const after = await hero.boundingBox();
+
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    expect(after?.y).toBe(before?.y);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileStatus = await page.getByRole('status').boundingBox();
+    const mobileHero = await hero.boundingBox();
+    expect(mobileStatus).not.toBeNull();
+    expect(mobileHero).not.toBeNull();
+    expect((mobileStatus?.y || 0) + (mobileStatus?.height || 0)).toBeLessThan(mobileHero?.y || 0);
+  });
+
   test('相同图标只发起一次代理请求', async ({ page }) => {
     const sharedIcon = 'https://assets.example.com/shared-icon.png';
     const publicData = {

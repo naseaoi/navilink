@@ -91,6 +91,16 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
     <div className="flex min-h-screen bg-canvas font-sans text-1 transition-colors duration-300">
       <Sidebar categories={data.categories} theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} />
 
+      {dataStatus && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed left-1/2 top-16 z-50 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-control border border-amber-200 bg-amber-50/95 px-3 py-1.5 text-[12px] font-medium text-amber-700 shadow-soft backdrop-blur-md dark:border-amber-900/50 dark:bg-amber-950/90 dark:text-amber-300 md:left-[calc(50%+124px)] md:top-6"
+        >
+          {dataStatus}
+        </div>
+      )}
+
       <div className="relative min-w-0 flex-1 overflow-hidden">
         <div className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-accent/20 blur-[120px] dark:bg-accent/12" />
         <div className="pointer-events-none absolute right-20 top-8 h-[320px] w-[320px] rounded-full bg-fuchsia-400/15 blur-[110px] dark:bg-fuchsia-500/8" />
@@ -98,11 +108,6 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
         <MobileBar theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} onSearchOpen={() => setIsSearchOpen(true)} />
 
         <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-8 md:px-12 md:py-20">
-          {dataStatus && (
-            <div className="mb-4 w-fit rounded-control border border-amber-200 bg-amber-50 px-3 py-1.5 text-[12px] font-medium text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-300">
-              {dataStatus}
-            </div>
-          )}
           <Outlet context={outletContext} />
         </main>
       </div>
