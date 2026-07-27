@@ -11,6 +11,8 @@
 - 双存储模式：本地 JSON 文件 或 WebDAV 云同步
 - HttpOnly Cookie 登录态、登录限流、scrypt 密码哈希、HMAC Token 鉴权
 - 批量保存接口：统一保存公开数据和私有数据，支持版本冲突提示
+- 公开数据短时缓存与本地优先渲染，WebDAV 异常时保留最近可用数据
+- Express 静态资源协商压缩、健康检查和优雅退出
 - 安全图标代理：协议校验、内网地址拦截、固定 DNS 解析、超时和响应大小限制
 - 支持 Vercel / Docker / VPS 多种部署方式
 
@@ -91,6 +93,8 @@ docker run -d \
   ghcr.io/<your-username>/navilink:latest
 ```
 
+容器使用 UID/GID `1000` 的非 root 用户运行。绑定宿主机目录前，请确保 `/opt/navilink/data` 对 UID `1000` 可写。容器健康检查访问 `/healthz`。
+
 如需 WebDAV 模式，追加环境变量：
 
 ```bash
@@ -137,6 +141,8 @@ pm2 start server.js --name navilink
 | `WEBDAV_ALLOW_HTTP` | 否 | `false` | 是否允许 HTTP WebDAV，仅限可信内网调试 |
 | `WEBDAV_TIMEOUT_MS` | 否 | `10000` | WebDAV 请求超时（毫秒，最大 `60000`） |
 | `WEBDAV_MAX_RESPONSE_BYTES` | 否 | `10485760` | WebDAV 响应体上限（最大 20 MiB） |
+| `PUBLIC_DATA_CACHE_TTL_MS` | 否 | `15000` | Express 公开数据内存缓存时间（毫秒，最大 `300000`） |
+| `PUBLIC_DATA_CDN_TTL_SECONDS` | 否 | `15` | Vercel/CDN 公开数据共享缓存时间（秒，最大 `300`） |
 | `CORS_ORIGINS` | 否 | 空（允许所有） | 允许的跨域来源，逗号分隔 |
 | `LOGIN_WINDOW_MS` | 否 | `60000` | 登录限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 窗口内最大登录失败次数 |
@@ -168,6 +174,7 @@ pm2 start server.js --name navilink
 
 - 首页：`http://localhost:3000`
 - 管理后台：`http://localhost:3000/tat`
+- 健康检查：`http://localhost:3000/healthz`
 
 默认账号：`admin` / `admin123`
 

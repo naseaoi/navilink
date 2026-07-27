@@ -19,7 +19,11 @@ test.describe.serial('核心流程', () => {
     await expect.poll(() => requestedUrls.filter((url) => new URL(url).pathname === '/api/icon-proxy').length).toBe(2);
     expect(requestedUrls).not.toContain('https://www.google.com/favicon.ico');
     expect(requestedUrls).not.toContain('https://github.com/favicon.ico');
+    expect(requestedUrls.some((url) => ['fonts.googleapis.com', 'fonts.gstatic.com'].includes(new URL(url).hostname))).toBe(false);
     expect((await compressedAsset).headers()['content-encoding']).toMatch(/^(br|gzip)$/);
+    const health = await page.request.get('/healthz');
+    expect(health.ok()).toBe(true);
+    expect(await health.json()).toEqual({ ok: true });
   });
 
   test('默认密码登录后必须修改密码', async ({ page }) => {

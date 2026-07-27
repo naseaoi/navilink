@@ -10,10 +10,10 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
-      // 字体 - 现代精致:Inter 全栈,移除 Playfair Display
+      // 字体栈
       fontFamily: {
-        sans: ['Inter', '"Noto Sans SC"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-        display: ['"Inter Display"', 'Inter', '"Noto Sans SC"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"Microsoft YaHei"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        display: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"Microsoft YaHei"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       // 字距 / 行高微调

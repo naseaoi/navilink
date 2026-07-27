@@ -27,10 +27,10 @@
 
 - [x] 后台存储状态仅在进入存储页时加载，独立数据读取并发执行
 - [x] 为 Express/Vercel 认证入口补充统一契约测试
-- [ ] 前端构建依赖移出 Docker 生产依赖，容器使用非 root 用户
-- [ ] 增加健康检查端点、Docker HEALTHCHECK 和 SIGTERM 优雅退出
-- [ ] 移除首屏第三方字体请求，收紧对应 CSP
-- [ ] 更新部署文档，通过全量构建和 Chromium E2E
+- [x] 前端构建依赖移出 Docker 生产依赖，容器使用非 root 用户
+- [x] 增加健康检查端点、Docker HEALTHCHECK 和 SIGTERM 优雅退出
+- [x] 移除首屏第三方字体请求，收紧对应 CSP
+- [x] 更新部署文档，通过全量构建和 Chromium E2E
 
 ## 最终验收
 

@@ -38,6 +38,7 @@ const USE_WEBDAV = hasWebDavConfig();
 
 const app = express();
 app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+app.disable('x-powered-by');
 
 const corsOptions = {
   origin(origin, callback) {
@@ -56,7 +57,7 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use((_req, res, next) => {
   res.set({
-    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
@@ -132,12 +133,17 @@ registerStorageRoutes({ app, storage, requireAuth, useWebDav: USE_WEBDAV });
 
 app.get('/api/icon-proxy', createIconProxyHandler());
 
+app.get('/healthz', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({ ok: true });
+});
+
 // 所有其他路由返回 index.html (SPA 支持)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   storage.getStorageMode().then((mode) => {
     console.log(`Storage: ${mode === 'webdav' ? 'WebDAV' : 'Local'}`);
@@ -145,3 +151,19 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('Storage: Local');
   });
 });
+
+let isShuttingDown = false;
+const shutdown = (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[System] Received ${signal}, shutting down`);
+  const forceExitTimer = setTimeout(() => process.exit(1), 10_000);
+  forceExitTimer.unref();
+  server.close((error) => {
+    clearTimeout(forceExitTimer);
+    process.exit(error ? 1 : 0);
+  });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
