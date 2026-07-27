@@ -44,6 +44,9 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
         if (result.status === 404 && fileName === 'public.json') {
           return res.json(await storage.readPublicOrDefault());
         }
+        if (isWrite && result.status >= 200 && result.status < 300) {
+          storage.updateMemoryCache(fileName, req.body);
+        }
         if (result.json) return res.status(result.status).json(result.body);
         return res.status(result.status).send(result.body);
       } catch (error) {

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import verifyHandler from '../api/auth/verify.js';
+import logoutHandler from '../api/auth/logout.js';
 import {
   buildAuthCookie,
   buildClearAuthCookie,
@@ -14,6 +16,23 @@ import { createLoginRateLimiter } from '../api/_shared/rateLimit.js';
 import { changeAdminPassword } from '../api/_shared/passwordService.js';
 
 const createRequest = () => ({ headers: {}, ip: '127.0.0.1' });
+
+const createResponse = () => ({
+  statusCode: 200,
+  headers: {},
+  body: null,
+  status(code) {
+    this.statusCode = code;
+    return this;
+  },
+  setHeader(name, value) {
+    this.headers[name] = value;
+  },
+  json(body) {
+    this.body = body;
+    return this;
+  }
+});
 
 const createFixedRateLimiter = (options = {}) => createLoginRateLimiter({
   windowMs: 60_000,
@@ -65,6 +84,26 @@ describe('auth helpers', () => {
     const token = signToken({ username: 'admin', exp: Date.now() + 1000, mustChangePassword: true }, 'secret');
     const request = { headers: { authorization: `Bearer ${token}` } };
     assert.equal(getWritableAuthPayload(request, 'secret').error, 'PASSWORD_CHANGE_REQUIRED');
+  });
+
+  it('supports dedicated Vercel verify and logout endpoints', async () => {
+    const previousSecret = process.env.AUTH_SECRET;
+    process.env.AUTH_SECRET = 'endpoint-secret';
+    try {
+      const token = signToken({ username: 'admin', exp: Date.now() + 60_000 }, 'endpoint-secret');
+      const verifyResponse = createResponse();
+      await verifyHandler({ method: 'GET', headers: { cookie: `navilink_session=${token}` } }, verifyResponse);
+      assert.equal(verifyResponse.statusCode, 200);
+      assert.equal(verifyResponse.body.ok, true);
+
+      const logoutResponse = createResponse();
+      await logoutHandler({ method: 'POST', headers: {} }, logoutResponse);
+      assert.equal(logoutResponse.statusCode, 200);
+      assert.match(logoutResponse.headers['Set-Cookie'], /Max-Age=0/);
+    } finally {
+      if (previousSecret === undefined) delete process.env.AUTH_SECRET;
+      else process.env.AUTH_SECRET = previousSecret;
+    }
   });
 });
 

@@ -2,9 +2,14 @@ import { expect, test } from '@playwright/test';
 
 test.describe.serial('核心流程', () => {
   test('空存储首次打开会显示默认导航', async ({ page }) => {
+    const requestedPaths: string[] = [];
+    page.on('request', (request) => requestedPaths.push(new URL(request.url()).pathname));
+    const compressedAsset = page.waitForResponse((response) => response.url().includes('/assets/react-vendor-'));
     await page.goto('/');
     await expect(page).toHaveTitle('我的导航');
     await expect(page.getByText('Google', { exact: true })).toBeVisible();
+    expect(requestedPaths.some((path) => path.startsWith('/api/auth'))).toBe(false);
+    expect((await compressedAsset).headers()['content-encoding']).toMatch(/^(br|gzip)$/);
   });
 
   test('默认密码登录后必须修改密码', async ({ page }) => {

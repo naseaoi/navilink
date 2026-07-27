@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import crypto from 'crypto';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
@@ -9,6 +10,7 @@ import { createDefaultPrivateData } from './api/_shared/auth.js';
 import { createDefaultPublicData } from './api/_shared/defaultData.js';
 import { createLoginRateLimiter } from './api/_shared/rateLimit.js';
 import { hasWebDavConfig } from './api/_shared/webdav.js';
+import { getPublicDataCacheControl } from './api/_shared/httpCache.js';
 import { registerAuthRoutes, createRequireAuth } from './server/authRoutes.js';
 import { createIconProxyHandler } from './server/iconProxy.js';
 import { createStorageService } from './server/localStorage.js';
@@ -49,6 +51,7 @@ const corsOptions = {
 };
 
 // 中间件
+app.use(compression());
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use((_req, res, next) => {
@@ -64,7 +67,10 @@ app.use((_req, res, next) => {
 });
 app.use(express.json({ limit: '10mb' })); // 支持大 JSON 数据
 app.use('/api', (req, res, next) => {
-  res.set('Cache-Control', 'no-store');
+  const isPublicDataRead = req.method === 'GET'
+    && req.path === '/webdav'
+    && (req.query.file === undefined || req.query.file === 'public.json');
+  res.set('Cache-Control', isPublicDataRead ? getPublicDataCacheControl() : 'no-store');
   return next();
 });
 app.use('/assets', express.static(DIST_ASSETS_DIR, {

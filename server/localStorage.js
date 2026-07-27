@@ -4,7 +4,14 @@ import { existsSync, mkdirSync } from 'fs';
 import { fetchWebDavJson, fetchWebDavJsonWithMeta, putWebDavJson, putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { getUpdatedAt, withTimestamp } from '../api/_shared/data.js';
 
-export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, defaultPublicData, defaultPrivateData }) => {
+export const createStorageService = ({
+  dataDir,
+  storageConfigPath,
+  useWebDav,
+  defaultPublicData,
+  defaultPrivateData,
+  publicCacheTtlMs = process.env.PUBLIC_DATA_CACHE_TTL_MS
+}) => {
   if (!existsSync(dataDir)) {
     console.log(`[System] Creating data directory: ${dataDir}`);
     mkdirSync(dataDir, { recursive: true });
@@ -13,6 +20,18 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
   const memoryCache = {
     'public.json': null,
     'private.json': null
+  };
+  const parsedPublicCacheTtlMs = Number(publicCacheTtlMs);
+  const effectivePublicCacheTtlMs = Number.isSafeInteger(parsedPublicCacheTtlMs)
+    && parsedPublicCacheTtlMs >= 0
+    && parsedPublicCacheTtlMs <= 300_000
+    ? parsedPublicCacheTtlMs
+    : 15_000;
+  let publicCacheExpiresAt = 0;
+
+  const updateMemoryCache = (fileName, data) => {
+    memoryCache[fileName] = data;
+    if (fileName === 'public.json') publicCacheExpiresAt = Date.now() + effectivePublicCacheTtlMs;
   };
 
   const readLocalJson = async (filePath) => {
@@ -101,6 +120,8 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     storageModeCache = normalizeStorageMode(mode);
     if (storageModeCache === 'webdav' && !useWebDav) storageModeCache = 'local';
     await writeLocalJsonAtomic(storageConfigPath, { mode: storageModeCache });
+    memoryCache['public.json'] = null;
+    publicCacheExpiresAt = 0;
     return storageModeCache;
   };
 
@@ -116,7 +137,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
       return payload;
     }
     await writeLocalJsonAtomic(path.join(dataDir, fileName), payload);
-    memoryCache[fileName] = payload;
+    updateMemoryCache(fileName, payload);
     return payload;
   };
 
@@ -156,7 +177,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
       })));
     }
     payloads.forEach(({ fileName, data }) => {
-      memoryCache[fileName] = data;
+      updateMemoryCache(fileName, data);
     });
     return Object.fromEntries(payloads.map(({ fileName, data }) => [fileName, data]));
   };
@@ -177,9 +198,13 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
   };
 
   const readPublicOrDefault = async () => {
+    if (memoryCache['public.json'] && publicCacheExpiresAt > Date.now()) {
+      return memoryCache['public.json'];
+    }
     const mode = await getStorageMode();
     let publicData = await readDataFromStorage(mode, 'public.json');
     if (!publicData) publicData = await writeDataToStorage(mode, 'public.json', defaultPublicData);
+    else updateMemoryCache('public.json', publicData);
     return publicData;
   };
 
@@ -207,12 +232,12 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
         if (memoryCache[fileName]) return res.json(memoryCache[fileName]);
         const jsonData = await readLocalJson(filePath);
         if (!jsonData) return res.status(404).json({ error: 'File not found' });
-        memoryCache[fileName] = jsonData;
+        updateMemoryCache(fileName, jsonData);
         return res.json(jsonData);
       }
       if (req.method === 'PUT') {
-        memoryCache[fileName] = req.body;
         await writeLocalJsonAtomic(filePath, req.body);
+        updateMemoryCache(fileName, req.body);
         return res.json({ success: true });
       }
       return res.status(405).json({ error: 'Method not allowed' });
@@ -234,6 +259,7 @@ export const createStorageService = ({ dataDir, storageConfigPath, useWebDav, de
     readPrivateOrDefault,
     readPublicOrDefault,
     readStatus,
-    handleLocalStorage
+    handleLocalStorage,
+    updateMemoryCache
   };
 };

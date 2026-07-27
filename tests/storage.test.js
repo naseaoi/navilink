@@ -49,4 +49,27 @@ describe('storage initialization', () => {
       await fs.rm(dataDir, { recursive: true, force: true });
     }
   });
+
+  it('serves public data from memory and refreshes it after cache updates', async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'navilink-cache-'));
+    try {
+      const storage = createStorageService({
+        dataDir,
+        storageConfigPath: path.join(dataDir, 'storage.json'),
+        useWebDav: false,
+        defaultPublicData: createDefaultPublicData(),
+        defaultPrivateData: { admin: { username: 'admin', passwordHash: 'unused' } },
+        publicCacheTtlMs: 60_000
+      });
+      const initial = await storage.readPublicOrDefault();
+      await fs.writeFile(path.join(dataDir, 'public.json'), JSON.stringify({ ...initial, settings: { ...initial.settings, title: 'disk' } }));
+      assert.equal((await storage.readPublicOrDefault()).settings.title, initial.settings.title);
+
+      const updated = { ...initial, settings: { ...initial.settings, title: 'updated' } };
+      storage.updateMemoryCache('public.json', updated);
+      assert.equal((await storage.readPublicOrDefault()).settings.title, 'updated');
+    } finally {
+      await fs.rm(dataDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PublicView } from './components/PublicView';
 import { HomePage } from './components/public/HomePage';
 import { CategoryPage } from './components/public/CategoryPage';
@@ -15,14 +15,21 @@ import { AppState, PrivateData } from './types';
 
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((mod) => ({ default: mod.AdminDashboard })));
 
+const EMPTY_PUBLIC_DATA = { settings: { title: 'NaviLink', icon: '' }, categories: [], cards: [] };
+
+const createInitialState = (): AppState => {
+  const cached = webdav.getCachedPublicData();
+  return cached
+    ? { publicData: cached, hasFetchedPublicData: true, error: '正在使用本地缓存' }
+    : { publicData: EMPTY_PUBLIC_DATA, hasFetchedPublicData: false, error: null };
+};
+
 const MainApp = () => {
-  const [state, setState] = useState<AppState>({
-    publicData: { settings: { title: 'NaviLink', icon: '' }, categories: [], cards: [] },
-    hasFetchedPublicData: false,
-    error: null
-  });
+  const location = useLocation();
+  const [state, setState] = useState<AppState>(createInitialState);
   const [privateData, setPrivateData] = useState<PrivateData | null>(null);
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'anonymous'>('checking');
+  const [verifiedAdminEntryKey, setVerifiedAdminEntryKey] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
@@ -43,17 +50,28 @@ const MainApp = () => {
   }, []);
 
   useEffect(() => {
+    if (location.pathname !== '/tat') return;
+    let active = true;
+    setAuthState('checking');
+    setVerifiedAdminEntryKey(null);
     const verifySession = async () => {
       try {
         const session = await verifyAuthSession();
+        if (!active) return;
         setMustChangePassword(session.mustChangePassword);
         setAuthState(session.authenticated ? 'authenticated' : 'anonymous');
       } catch {
+        if (!active) return;
         setAuthState('anonymous');
+      } finally {
+        if (active) setVerifiedAdminEntryKey(location.key);
       }
     };
     verifySession();
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [location.key, location.pathname]);
 
   useEffect(() => {
     const loadPrivate = async () => {
@@ -88,7 +106,7 @@ const MainApp = () => {
         <Route path="/c/:categoryId" element={<CategoryPage />} />
       </Route>
       <Route path="/tat" element={
-        authState === 'authenticated' ? (
+        verifiedAdminEntryKey !== location.key ? null : authState === 'authenticated' ? (
           privateData ? (
             <Suspense fallback={null}>
               <AdminDashboard

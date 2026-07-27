@@ -56,12 +56,24 @@ export const parsePublicData = (value: unknown): PublicData => {
 };
 
 export const readPublicDataCache = (key: string): PublicData | null => {
-  const stored = localStorage.getItem(key);
-  if (!stored) return null;
   try {
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
     return parsePublicData(JSON.parse(stored));
   } catch {
-    localStorage.removeItem(key);
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      return null;
+    }
     return null;
+  }
+};
+
+export const writePublicDataCache = (key: string, data: PublicData): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    return;
   }
 };

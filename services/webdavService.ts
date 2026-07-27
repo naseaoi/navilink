@@ -1,5 +1,5 @@
 import { PublicData, PrivateData } from '../types';
-import { parsePublicData, readPublicDataCache } from './publicDataCache';
+import { parsePublicData, readPublicDataCache, writePublicDataCache } from './publicDataCache';
 
 const PUBLIC_CACHE_KEY = 'navilink_public';
 
@@ -40,6 +40,10 @@ class WebDavService {
 
   getPublicDataSource(): 'api' | 'localStorage' | 'default' {
     return this.publicDataSource;
+  }
+
+  getCachedPublicData(): PublicData | null {
+    return readPublicDataCache(PUBLIC_CACHE_KEY);
   }
 
   async getStorageMode(): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
@@ -86,6 +90,7 @@ class WebDavService {
   }
 
   async fetchPublicData(): Promise<PublicData> {
+    const cached = readPublicDataCache(PUBLIC_CACHE_KEY);
     try {
       const response = await fetch('/api/webdav?file=public.json', {
         method: 'GET',
@@ -94,20 +99,22 @@ class WebDavService {
 
       if (!response.ok) throw new Error(`Public data request failed: ${response.status}`);
       const data = parsePublicData(await response.json());
-      localStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify(data));
+      const cachedVersion = cached?._meta?.updatedAt ?? 0;
+      const remoteVersion = data._meta?.updatedAt ?? 0;
+      if (cached && cachedVersion > remoteVersion) {
+        this.publicDataSource = 'localStorage';
+        return cached;
+      }
+      writePublicDataCache(PUBLIC_CACHE_KEY, data);
       this.publicDataSource = 'api';
       return data;
-    } catch (error) {
-      if (error instanceof TypeError) {
-        const cached = readPublicDataCache(PUBLIC_CACHE_KEY);
-        if (cached) {
-          this.publicDataSource = 'localStorage';
-          return cached;
-        }
-        this.publicDataSource = 'default';
-        return DEFAULT_PUBLIC_DATA;
+    } catch {
+      if (cached) {
+        this.publicDataSource = 'localStorage';
+        return cached;
       }
-      throw error;
+      this.publicDataSource = 'default';
+      return DEFAULT_PUBLIC_DATA;
     }
   }
 
@@ -121,7 +128,7 @@ class WebDavService {
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error('Failed to save via API');
-    localStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify(data));
+    writePublicDataCache(PUBLIC_CACHE_KEY, data);
   }
 
   async fetchPrivateData(): Promise<PrivateData> {
@@ -180,7 +187,7 @@ class WebDavService {
     if (response.status === 409) throw new Error('DATA_CONFLICT');
     if (!response.ok) throw new Error('Failed to save data');
     const result: { publicData: PublicData; privateData: PrivateData } = await response.json();
-    localStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify(result.publicData));
+    writePublicDataCache(PUBLIC_CACHE_KEY, result.publicData);
     return result;
   }
 }
