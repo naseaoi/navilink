@@ -30,6 +30,7 @@ export const createStorageService = ({
     ? parsedPublicCacheTtlMs
     : 15_000;
   let publicCacheExpiresAt = 0;
+  let publicReadInFlight = null;
   let writeQueue = Promise.resolve();
 
   const runWrite = (operation) => {
@@ -211,7 +212,7 @@ export const createStorageService = ({
         readDataFromStorage(mode, 'private.json')
       ]);
     }
-    const prepared = prepareSaveData({ currentPublic, currentPrivate, publicData, privateData, expected });
+    const prepared = await prepareSaveData({ currentPublic, currentPrivate, publicData, privateData, expected });
     return writeDataBatchToStorageUnlocked(mode, [
       { fileName: 'public.json', data: prepared.publicData },
       { fileName: 'private.json', data: prepared.privateData }
@@ -232,11 +233,19 @@ export const createStorageService = ({
     if (memoryCache['public.json'] && publicCacheExpiresAt > Date.now()) {
       return memoryCache['public.json'];
     }
-    const mode = await getStorageMode();
-    let publicData = await readDataFromStorage(mode, 'public.json');
-    if (!publicData) publicData = await writeDataToStorage(mode, 'public.json', defaultPublicData);
-    else updateMemoryCache('public.json', publicData);
-    return publicData;
+    if (publicReadInFlight) return publicReadInFlight;
+    publicReadInFlight = (async () => {
+      const mode = await getStorageMode();
+      let publicData = await readDataFromStorage(mode, 'public.json');
+      if (!publicData) publicData = await writeDataToStorage(mode, 'public.json', defaultPublicData);
+      else updateMemoryCache('public.json', publicData);
+      return publicData;
+    })();
+    try {
+      return await publicReadInFlight;
+    } finally {
+      publicReadInFlight = null;
+    }
   };
 
   const readStatus = async () => {

@@ -1,4 +1,4 @@
-import { DEFAULT_ADMIN_PASSWORD, buildAuthCookie, hashPassword, signToken } from './auth.js';
+import { DEFAULT_ADMIN_PASSWORD, buildAuthCookie, hashPasswordAsync, signToken } from './auth.js';
 import { withTimestamp } from './data.js';
 import { validatePasswordChangePayload } from './validation.js';
 
@@ -19,7 +19,7 @@ export const changeAdminPassword = async ({ body, authPayload, authSecret, write
   const privateData = withTimestamp('private.json', {
     admin: {
       username: input.username,
-      passwordHash: hashPassword(input.password)
+      passwordHash: await hashPasswordAsync(input.password)
     }
   });
   await writePrivateData(privateData);

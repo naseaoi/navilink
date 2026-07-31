@@ -23,7 +23,7 @@ export default async function handler(request, response) {
       fetchWebDavJsonWithMeta('public.json', env),
       fetchWebDavJsonWithMeta('private.json', env)
     ]);
-    const prepared = prepareSaveData({
+    const prepared = await prepareSaveData({
       currentPublic: currentPublic.data,
       currentPrivate: currentPrivate.data,
       publicData: request.body?.publicData,

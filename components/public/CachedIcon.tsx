@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getCachedIconSrc, releaseCachedIconSrc } from '../../services/iconCache';
+import { observeVisibility } from '../../services/visibilityObserver';
 
 /**
  * 统一的卡片图标组件
@@ -40,17 +41,9 @@ export const CachedIcon: React.FC<CachedIconProps> = ({ icon, siteUrl, alt, clas
   useEffect(() => {
     setIsVisible(false);
     if (!normalizedIcon || isInlineIcon) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      setIsVisible(true);
-      return;
-    }
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return;
-      setIsVisible(true);
-      observer.disconnect();
-    }, { rootMargin: '200px' });
-    if (imageRef.current) observer.observe(imageRef.current);
-    return () => observer.disconnect();
+    const image = imageRef.current;
+    if (!image) return;
+    return observeVisibility(image, () => setIsVisible(true));
   }, [isInlineIcon, normalizedIcon]);
 
   useEffect(() => {

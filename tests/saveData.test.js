@@ -21,8 +21,8 @@ const privateData = {
 };
 
 describe('save data helpers', () => {
-  it('rejects stale public data saves', () => {
-    assert.throws(() => prepareSaveData({
+  it('rejects stale public data saves', async () => {
+    await assert.rejects(() => prepareSaveData({
       currentPublic: { ...publicData, _meta: { updatedAt: 2 } },
       currentPrivate: { ...privateData, _meta: { updatedAt: 1 } },
       publicData,
@@ -31,8 +31,8 @@ describe('save data helpers', () => {
     }), /public data changed/);
   });
 
-  it('prepares valid save payloads', () => {
-    const result = prepareSaveData({
+  it('prepares valid save payloads', async () => {
+    const result = await prepareSaveData({
       currentPublic: { ...publicData, _meta: { updatedAt: 1 } },
       currentPrivate: { ...privateData, _meta: { updatedAt: 1 } },
       publicData,
@@ -41,5 +41,6 @@ describe('save data helpers', () => {
     });
     assert.equal(result.publicData.cards[0].url, 'https://example.com/');
     assert.equal(result.privateData.admin.username, 'admin');
+    assert.match(result.privateData.admin.passwordHash, /^scrypt\$/);
   });
 });

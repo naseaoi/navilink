@@ -41,7 +41,14 @@ const MainApp = () => {
         const pub = await webdav.fetchPublicData();
         const source = webdav.getPublicDataSource();
         const error = source === 'api' ? null : source === 'localStorage' ? '正在使用本地缓存' : '正在使用默认数据';
-        setState(prev => ({ ...prev, publicData: pub, hasFetchedPublicData: true, error }));
+        setState((prev) => {
+          const previousVersion = prev.publicData._meta?.updatedAt;
+          const nextVersion = pub._meta?.updatedAt;
+          if (prev.hasFetchedPublicData && prev.error === error && previousVersion && previousVersion === nextVersion) {
+            return prev;
+          }
+          return { ...prev, publicData: pub, hasFetchedPublicData: true, error };
+        });
       } catch (e) {
         setState(prev => ({ ...prev, hasFetchedPublicData: true, error: '无法同步远程数据' }));
       }

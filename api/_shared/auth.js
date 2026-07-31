@@ -1,10 +1,13 @@
 import crypto from 'crypto';
+import { promisify } from 'util';
 
 export const DEFAULT_ADMIN_PASSWORD = 'admin123';
 export const AUTH_COOKIE_NAME = 'navilink_session';
+const scryptAsync = promisify(crypto.scrypt);
 
 const base64UrlEncode = (input) => Buffer.from(input).toString('base64url');
 const base64UrlDecode = (input) => Buffer.from(input, 'base64url').toString();
+const isScryptRecord = (salt, hash) => /^[a-f0-9]{32}$/i.test(salt || '') && /^[a-f0-9]{128}$/i.test(hash || '');
 
 export const signToken = (payload, secret) => {
   const body = base64UrlEncode(JSON.stringify(payload));
@@ -38,12 +41,28 @@ export const hashPassword = (password) => {
   return `scrypt$${salt}$${hash}`;
 };
 
+export const hashPasswordAsync = async (password) => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = await scryptAsync(password, salt, 64);
+  return `scrypt$${salt}$${hash.toString('hex')}`;
+};
+
 export const verifyPassword = (password, stored) => {
   if (!stored) return false;
   if (!stored.startsWith('scrypt$')) return password === stored;
   const [, salt, hash] = stored.split('$');
-  if (!salt || !hash) return false;
+  if (!isScryptRecord(salt, hash)) return false;
   const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  if (hash.length !== derived.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(derived));
+};
+
+export const verifyPasswordAsync = async (password, stored) => {
+  if (!stored) return false;
+  if (!stored.startsWith('scrypt$')) return password === stored;
+  const [, salt, hash] = stored.split('$');
+  if (!isScryptRecord(salt, hash)) return false;
+  const derived = (await scryptAsync(password, salt, 64)).toString('hex');
   if (hash.length !== derived.length) return false;
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(derived));
 };
@@ -56,10 +75,28 @@ export const normalizePrivateData = (data) => {
   return data;
 };
 
+export const normalizePrivateDataAsync = async (data) => {
+  if (!data?.admin?.passwordHash || data.admin.passwordHash.startsWith('scrypt$')) return data;
+  return {
+    ...data,
+    admin: {
+      ...data.admin,
+      passwordHash: await hashPasswordAsync(data.admin.passwordHash)
+    }
+  };
+};
+
 export const createDefaultPrivateData = () => ({
   admin: {
     username: 'admin',
     passwordHash: hashPassword(DEFAULT_ADMIN_PASSWORD)
+  }
+});
+
+export const createDefaultPrivateDataAsync = async () => ({
+  admin: {
+    username: 'admin',
+    passwordHash: await hashPasswordAsync(DEFAULT_ADMIN_PASSWORD)
   }
 });
 

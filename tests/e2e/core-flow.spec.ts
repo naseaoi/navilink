@@ -96,6 +96,32 @@ test.describe.serial('核心流程', () => {
     await expect.poll(() => requestedIcons.filter((url) => url === sharedIcon).length).toBe(1);
   });
 
+  test('大分类分批渲染卡片', async ({ page }) => {
+    const categoryId = 'large-category';
+    const cards = Array.from({ length: 60 }, (_, index) => ({
+      id: `large-card-${index}`,
+      categoryId,
+      title: `大型分类卡片 ${index + 1}`,
+      description: '',
+      url: `https://example.com/item-${index + 1}`,
+      icon: '',
+      order: index
+    }));
+    await page.route((url) => url.pathname === '/api/webdav' && url.searchParams.get('file') === 'public.json', (route) => route.fulfill({
+      json: {
+        settings: { title: '大分类', icon: '' },
+        categories: [{ id: categoryId, name: '大型分类', order: 0 }],
+        cards,
+        _meta: { updatedAt: 300 }
+      }
+    }));
+
+    await page.goto(`/c/${categoryId}`);
+    await expect(page.locator('.animate-card-enter')).toHaveCount(48);
+    await page.getByRole('button', { name: '加载更多' }).click();
+    await expect(page.locator('.animate-card-enter')).toHaveCount(60);
+  });
+
   test('默认密码登录后必须修改密码', async ({ page }) => {
     await page.goto('/tat');
     await page.getByLabel('用户名').fill('admin');

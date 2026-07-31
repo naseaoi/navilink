@@ -1,4 +1,4 @@
-import { normalizePrivateData } from './auth.js';
+import { normalizePrivateDataAsync } from './auth.js';
 import { getUpdatedAt } from './data.js';
 import { validateDataFilePayload } from './validation.js';
 
@@ -15,10 +15,10 @@ const assertVersionMatch = (label, current, expected) => {
   }
 };
 
-export const prepareSaveData = ({ currentPublic, currentPrivate, publicData, privateData, expected }) => {
+export const prepareSaveData = async ({ currentPublic, currentPrivate, publicData, privateData, expected }) => {
   assertVersionMatch('public', currentPublic, expected?.publicUpdatedAt);
   assertVersionMatch('private', currentPrivate, expected?.privateUpdatedAt);
   const validatedPublic = validateDataFilePayload('public.json', publicData);
-  const validatedPrivate = normalizePrivateData(validateDataFilePayload('private.json', privateData));
+  const validatedPrivate = await normalizePrivateDataAsync(validateDataFilePayload('private.json', privateData));
   return { publicData: validatedPublic, privateData: validatedPrivate };
 };

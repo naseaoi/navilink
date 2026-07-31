@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useState, useMemo, useEffect, useRef } from 'react';
+import React, { useCallback, useDeferredValue, useState, useMemo, useEffect, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { PublicData, LinkCard } from '../types';
 import { ArrowUpRight } from 'lucide-react';
@@ -24,13 +24,13 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
   const searchInputRef = useRef<HTMLInputElement>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  const closeSearch = () => {
+  const closeSearch = useCallback(() => {
     setIsSearchOpen(false);
     setSearchQuery('');
-  };
+  }, []);
 
   const clickRef = useRef({ count: 0, lastTime: 0 });
-  const handleLogoClick = () => {
+  const handleLogoClick = useCallback(() => {
     const now = Date.now();
     if (now - clickRef.current.lastTime < 500) {
       clickRef.current.count += 1;
@@ -42,7 +42,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
       clickRef.current.count = 0;
       navigate('/tat');
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     if (data.settings.title) document.title = data.settings.title;
@@ -64,7 +64,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [closeSearch]);
 
   const searchResults = useMemo(() => {
     const q = deferredSearchQuery.trim().toLowerCase();
@@ -75,17 +75,18 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
       .slice(0, 8);
   }, [data.cards, deferredSearchQuery]);
 
-  const openSearchResult = (card: LinkCard) => {
+  const openSearchResult = useCallback((card: LinkCard) => {
     setConfirmCard(card);
     closeSearch();
-  };
+  }, [closeSearch]);
 
-  const outletContext: PublicOutletContext = {
+  const openSearch = useCallback(() => setIsSearchOpen(true), []);
+  const outletContext = useMemo<PublicOutletContext>(() => ({
     data,
     hasFetchedData,
     onCardClick: setConfirmCard,
-    onSearchOpen: () => setIsSearchOpen(true)
-  };
+    onSearchOpen: openSearch
+  }), [data, hasFetchedData, openSearch]);
 
   return (
     <div className="flex min-h-screen bg-canvas font-sans text-1 transition-colors duration-300">
@@ -105,7 +106,7 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
         <div className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-accent/20 blur-[120px] dark:bg-accent/12" />
         <div className="pointer-events-none absolute right-20 top-8 h-[320px] w-[320px] rounded-full bg-fuchsia-400/15 blur-[110px] dark:bg-fuchsia-500/8" />
 
-        <MobileBar theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} onSearchOpen={() => setIsSearchOpen(true)} />
+        <MobileBar theme={theme} onToggleTheme={onToggleTheme} onLogoClick={handleLogoClick} onSearchOpen={openSearch} />
 
         <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-8 md:px-12 md:py-20">
           <Outlet context={outletContext} />

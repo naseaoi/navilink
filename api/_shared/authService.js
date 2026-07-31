@@ -1,9 +1,9 @@
 import {
   DEFAULT_ADMIN_PASSWORD,
   buildAuthCookie,
-  normalizePrivateData,
+  normalizePrivateDataAsync,
   signToken,
-  verifyPassword
+  verifyPasswordAsync
 } from './auth.js';
 import { validateLoginPayload } from './validation.js';
 
@@ -40,17 +40,18 @@ export const loginAdmin = async ({
 
   const privateData = await readPrivateData();
   const stored = privateData?.admin?.passwordHash || '';
-  const isValid = verifyPassword(password, stored) && privateData?.admin?.username === username;
+  const passwordMatches = await verifyPasswordAsync(password, stored);
+  const isValid = passwordMatches && privateData?.admin?.username === username;
   if (!isValid) {
     rateKeys.forEach(loginRateLimiter.recordFailure);
     return { status: 401, body: { error: 'Invalid credentials' } };
   }
 
   rateKeys.forEach(loginRateLimiter.clear);
-  const mustChangePassword = verifyPassword(DEFAULT_ADMIN_PASSWORD, stored);
+  const mustChangePassword = password === DEFAULT_ADMIN_PASSWORD;
 
   if (stored && !stored.startsWith('scrypt$')) {
-    await writePrivateData(normalizePrivateData(privateData));
+    await writePrivateData(await normalizePrivateDataAsync(privateData));
   }
 
   const duration = remember ? REMEMBER_SESSION_MS : SESSION_DAY_MS;

@@ -5,7 +5,7 @@ import { HeroSearch } from './HeroSearch';
 import { CategoryGroups } from './CategoryGroups';
 import { QuoteFooter } from './QuoteFooter';
 
-export const HomePage: React.FC = () => {
+export const HomePage: React.FC = React.memo(() => {
   const { data, onCardClick, onSearchOpen } = usePublicOutlet();
 
   return (
@@ -19,4 +19,6 @@ export const HomePage: React.FC = () => {
       <QuoteFooter />
     </>
   );
-};
+});
+
+HomePage.displayName = 'HomePage';

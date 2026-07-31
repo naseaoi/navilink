@@ -1,5 +1,5 @@
 import { getRequestedDataFile } from '../api/_shared/data.js';
-import { normalizePrivateData } from '../api/_shared/auth.js';
+import { normalizePrivateDataAsync } from '../api/_shared/auth.js';
 import { proxyWebDavDataFile } from '../api/_shared/webdavProxy.js';
 import { validateDataFilePayload } from '../api/_shared/validation.js';
 
@@ -30,7 +30,7 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
     if (isWrite) {
       try {
         req.body = validateDataFilePayload(fileName, req.body);
-        if (isPrivate) req.body = normalizePrivateData(req.body);
+        if (isPrivate) req.body = await normalizePrivateDataAsync(req.body);
       } catch (error) {
         return sendValidationError(res, error);
       }
@@ -134,7 +134,7 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
       }
       await storage.writeDataBatchToStorage(to, [
         { fileName: 'public.json', data: validateDataFilePayload('public.json', publicData) },
-        { fileName: 'private.json', data: normalizePrivateData(validateDataFilePayload('private.json', privateData)) }
+        { fileName: 'private.json', data: await normalizePrivateDataAsync(validateDataFilePayload('private.json', privateData)) }
       ]);
       return res.json({ success: true });
     } catch (error) {

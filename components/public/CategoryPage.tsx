@@ -1,23 +1,35 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ChevronDown } from 'lucide-react';
 import { LinkCard } from '../../types';
 import { CachedIcon } from './CachedIcon';
 import { usePublicOutlet } from './publicOutlet';
 import { getCategoryIcon, sortCategories } from './categoryIcons';
 
-export const CategoryPage: React.FC = () => {
+const PAGE_SIZE = 48;
+
+export const CategoryPage: React.FC = React.memo(() => {
   const { categoryId } = useParams();
   const { data, hasFetchedData, onCardClick } = usePublicOutlet();
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const sorted = sortCategories(data.categories);
-  const index = sorted.findIndex((c) => c.id === categoryId);
+  const sorted = useMemo(() => sortCategories(data.categories), [data.categories]);
+  const index = useMemo(() => sorted.findIndex((item) => item.id === categoryId), [categoryId, sorted]);
   const category = index >= 0 ? sorted[index] : undefined;
+  const cards = useMemo(() => (
+    category
+      ? data.cards.filter((card) => card.categoryId === category.id).sort((a, b) => a.order - b.order)
+      : []
+  ), [category, data.cards]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [categoryId]);
 
   if (!category) return hasFetchedData ? <Navigate to="/" replace /> : null;
 
   const Icon = getCategoryIcon(category, index);
-  const cards = data.cards.filter((c) => c.categoryId === category.id).sort((a, b) => a.order - b.order);
+  const visibleCards = cards.slice(0, visibleCount);
 
   return (
     <>
@@ -46,7 +58,7 @@ export const CategoryPage: React.FC = () => {
           <div className="py-24 text-center text-[14px] text-3">该分类暂无内容</div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {cards.map((card, i) => (
+            {visibleCards.map((card, i) => (
               <CardItem
                 key={card.id}
                 card={card}
@@ -56,12 +68,26 @@ export const CategoryPage: React.FC = () => {
             ))}
           </div>
         )}
+        {visibleCount < cards.length && (
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((count) => Math.min(count + PAGE_SIZE, cards.length))}
+              className="inline-flex h-10 items-center gap-2 rounded-control border border-subtle bg-surface px-4 text-[13px] font-medium text-2 transition-colors hover:border-default hover:text-1"
+            >
+              <ChevronDown size={16} />
+              <span>加载更多</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1" />
     </>
   );
-};
+});
+
+CategoryPage.displayName = 'CategoryPage';
 
 const CardItem: React.FC<{ card: LinkCard; onClick: () => void; style?: React.CSSProperties }> = ({ card, onClick, style }) => (
   <button

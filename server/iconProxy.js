@@ -3,44 +3,20 @@ import http from 'http';
 import https from 'https';
 import net from 'net';
 
-const ICON_PROXY_MAX_BYTES = 5 * 1024 * 1024;
+const ICON_PROXY_MAX_BYTES = 512 * 1024;
 const ICON_PROXY_TIMEOUT_MS = 10_000;
 const ICON_PROXY_MAX_REDIRECTS = 3;
 const ICON_PROXY_WINDOW_MS = 60_000;
 const ICON_PROXY_MAX_REQUESTS = 120;
 const ICON_PROXY_FAILURE_TTL_MS = 5 * 60_000;
-const rateBuckets = new Map();
-const failedTargets = new Map();
+const ICON_PROXY_CACHE_TTL_MS = 30 * 24 * 60 * 60_000;
+const ICON_PROXY_MAX_CONCURRENT = 16;
+const ICON_PROXY_MAX_STATE_ENTRIES = 2_000;
+const ICON_PROXY_MAX_CACHE_ENTRIES = 256;
+const ICON_PROXY_MAX_CACHE_BYTES = 16 * 1024 * 1024;
 
 const getClientIp = (req) => {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
-  if (Array.isArray(forwarded) && forwarded[0]) return forwarded[0].split(',')[0].trim();
   return req.ip || req.socket?.remoteAddress || 'unknown';
-};
-
-const checkRateLimit = (req) => {
-  const key = getClientIp(req);
-  const now = Date.now();
-  const bucket = rateBuckets.get(key);
-  if (!bucket || now - bucket.startedAt > ICON_PROXY_WINDOW_MS) {
-    rateBuckets.set(key, { count: 1, startedAt: now });
-    return { limited: false, retryAfterSeconds: 0 };
-  }
-  bucket.count += 1;
-  rateBuckets.set(key, bucket);
-  if (bucket.count <= ICON_PROXY_MAX_REQUESTS) return { limited: false, retryAfterSeconds: 0 };
-  return { limited: true, retryAfterSeconds: Math.ceil((ICON_PROXY_WINDOW_MS - (now - bucket.startedAt)) / 1000) };
-};
-
-const hasRecentFailure = (target) => {
-  const failedAt = failedTargets.get(target);
-  if (!failedAt) return false;
-  if (Date.now() - failedAt > ICON_PROXY_FAILURE_TTL_MS) {
-    failedTargets.delete(target);
-    return false;
-  }
-  return true;
 };
 
 const isBlockedIpv4 = (address) => {
@@ -127,6 +103,12 @@ const requestIcon = async (targetUrl) => {
         Accept: 'image/*,*/*;q=0.8'
       }
     }, (response) => {
+      const status = response.statusCode || 0;
+      if ([301, 302, 303, 307, 308].includes(status)) {
+        response.resume();
+        resolve({ status, ok: false, headers: response.headers, body: Buffer.alloc(0) });
+        return;
+      }
       const contentLength = Number(response.headers['content-length'] || 0);
       if (contentLength > ICON_PROXY_MAX_BYTES) {
         response.resume();
@@ -146,8 +128,8 @@ const requestIcon = async (targetUrl) => {
       });
       response.on('end', () => {
         resolve({
-          status: response.statusCode || 0,
-          ok: response.statusCode >= 200 && response.statusCode < 300,
+          status,
+          ok: status >= 200 && status < 300,
           headers: response.headers,
           body: Buffer.concat(chunks)
         });
@@ -172,55 +154,183 @@ const fetchIconWithRedirects = async (targetUrl, redirectsLeft) => {
   return response;
 };
 
-export const createIconProxyHandler = () => async (req, res) => {
-  const target = String(req.query.url || '').trim();
-  if (!target) return res.status(400).json({ error: 'missing url' });
+const removeOldestEntry = (map) => {
+  const oldestKey = map.keys().next().value;
+  if (oldestKey !== undefined) map.delete(oldestKey);
+};
 
-  const rateState = checkRateLimit(req);
-  if (rateState.limited) {
-    res.set('Retry-After', String(rateState.retryAfterSeconds));
-    return res.status(429).json({ error: 'too many requests' });
-  }
+export const createIconProxyHandler = ({
+  fetchIcon = fetchIconWithRedirects,
+  maxConcurrent = ICON_PROXY_MAX_CONCURRENT,
+  maxCacheBytes = ICON_PROXY_MAX_CACHE_BYTES,
+  now = Date.now
+} = {}) => {
+  const rateBuckets = new Map();
+  const failedTargets = new Map();
+  const responseCache = new Map();
+  const inFlight = new Map();
+  let cacheBytes = 0;
+  let activeRequests = 0;
+  let nextStateSweepAt = 0;
 
-  if (hasRecentFailure(target)) {
-    return res.status(502).json({ error: 'recent fetch failed' });
-  }
+  const sweepState = (currentTime) => {
+    if (currentTime < nextStateSweepAt) return;
+    nextStateSweepAt = currentTime + ICON_PROXY_WINDOW_MS;
+    for (const [key, bucket] of rateBuckets) {
+      if (currentTime - bucket.startedAt > ICON_PROXY_WINDOW_MS) rateBuckets.delete(key);
+    }
+    for (const [target, failedAt] of failedTargets) {
+      if (currentTime - failedAt > ICON_PROXY_FAILURE_TTL_MS) failedTargets.delete(target);
+    }
+    for (const [target, cached] of responseCache) {
+      if (cached.expiresAt <= currentTime) {
+        responseCache.delete(target);
+        cacheBytes -= cached.body.length;
+      }
+    }
+  };
 
-  let parsed;
-  try {
-    parsed = new URL(target);
-  } catch {
-    return res.status(400).json({ error: 'invalid url' });
-  }
+  const checkRateLimit = (req) => {
+    const currentTime = now();
+    sweepState(currentTime);
+    const key = getClientIp(req);
+    const bucket = rateBuckets.get(key);
+    if (!bucket || currentTime - bucket.startedAt > ICON_PROXY_WINDOW_MS) {
+      if (!rateBuckets.has(key) && rateBuckets.size >= ICON_PROXY_MAX_STATE_ENTRIES) removeOldestEntry(rateBuckets);
+      rateBuckets.set(key, { count: 1, startedAt: currentTime });
+      return { limited: false, retryAfterSeconds: 0 };
+    }
+    bucket.count += 1;
+    if (bucket.count <= ICON_PROXY_MAX_REQUESTS) return { limited: false, retryAfterSeconds: 0 };
+    return { limited: true, retryAfterSeconds: Math.ceil((ICON_PROXY_WINDOW_MS - (currentTime - bucket.startedAt)) / 1000) };
+  };
 
-  try {
-    const upstream = await fetchIconWithRedirects(parsed, ICON_PROXY_MAX_REDIRECTS);
-    if (!upstream.ok) {
-      failedTargets.set(target, Date.now());
-      return res.status(502).json({ error: `upstream ${upstream.status}` });
+  const hasRecentFailure = (target) => {
+    const failedAt = failedTargets.get(target);
+    return failedAt !== undefined && now() - failedAt <= ICON_PROXY_FAILURE_TTL_MS;
+  };
+
+  const recordFailure = (target) => {
+    if (!failedTargets.has(target) && failedTargets.size >= ICON_PROXY_MAX_STATE_ENTRIES) removeOldestEntry(failedTargets);
+    failedTargets.delete(target);
+    failedTargets.set(target, now());
+  };
+
+  const readCachedResponse = (target) => {
+    const cached = responseCache.get(target);
+    if (!cached) return null;
+    if (cached.expiresAt <= now()) {
+      responseCache.delete(target);
+      cacheBytes -= cached.body.length;
+      return null;
     }
-    const contentType = getHeader(upstream.headers, 'content-type') || 'image/png';
-    if (!/^image\//i.test(contentType)) {
-      failedTargets.set(target, Date.now());
-      return res.status(415).json({ error: 'not an image' });
+    responseCache.delete(target);
+    responseCache.set(target, cached);
+    return cached;
+  };
+
+  const writeCachedResponse = (target, value) => {
+    if (value.body.length > maxCacheBytes) return;
+    const existing = responseCache.get(target);
+    if (existing) cacheBytes -= existing.body.length;
+    responseCache.delete(target);
+    while (responseCache.size >= ICON_PROXY_MAX_CACHE_ENTRIES || cacheBytes + value.body.length > maxCacheBytes) {
+      const oldestKey = responseCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      const oldest = responseCache.get(oldestKey);
+      responseCache.delete(oldestKey);
+      cacheBytes -= oldest.body.length;
     }
-    const contentLength = Number(getHeader(upstream.headers, 'content-length') || 0);
-    if (contentLength > ICON_PROXY_MAX_BYTES) {
-      return res.status(413).json({ error: 'too large' });
+    responseCache.set(target, value);
+    cacheBytes += value.body.length;
+  };
+
+  const loadResponse = (target, parsed) => {
+    const pending = inFlight.get(target);
+    if (pending) return pending;
+    if (activeRequests >= maxConcurrent) {
+      const error = new Error('busy');
+      error.statusCode = 503;
+      throw error;
     }
-    res.set('Content-Type', contentType);
-    res.set('Cache-Control', 'public, max-age=2592000, immutable');
-    res.set('Access-Control-Allow-Origin', '*');
-    return res.send(upstream.body);
-  } catch (error) {
-    failedTargets.set(target, Date.now());
-    console.error(`[Icon Proxy] ${target} -> ${error.message}`);
-    if (error.message === 'blocked host' || error.message === 'unsupported protocol') {
-      return res.status(400).json({ error: error.message });
+    activeRequests += 1;
+    const request = fetchIcon(parsed, ICON_PROXY_MAX_REDIRECTS)
+      .then((upstream) => {
+        if (!upstream.ok) {
+          const error = new Error(`upstream ${upstream.status}`);
+          error.statusCode = 502;
+          throw error;
+        }
+        const contentType = getHeader(upstream.headers, 'content-type') || 'image/png';
+        if (!/^image\//i.test(contentType)) {
+          const error = new Error('not an image');
+          error.statusCode = 415;
+          throw error;
+        }
+        if (!Buffer.isBuffer(upstream.body) || upstream.body.length > ICON_PROXY_MAX_BYTES) {
+          throw new Error('too large');
+        }
+        const value = { body: upstream.body, contentType, expiresAt: now() + ICON_PROXY_CACHE_TTL_MS };
+        writeCachedResponse(target, value);
+        failedTargets.delete(target);
+        return value;
+      })
+      .finally(() => {
+        activeRequests -= 1;
+        inFlight.delete(target);
+      });
+    inFlight.set(target, request);
+    return request;
+  };
+
+  const sendResponse = (res, cached) => {
+    res.setHeader('Content-Type', cached.contentType);
+    res.setHeader('Content-Length', String(cached.body.length));
+    res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.status(200).send(cached.body);
+  };
+
+  return async (req, res) => {
+    const target = String(req.query.url || '').trim();
+    if (!target) return res.status(400).json({ error: 'missing url' });
+    if (target.length > 2_048) return res.status(400).json({ error: 'url too long' });
+
+    const rateState = checkRateLimit(req);
+    if (rateState.limited) {
+      res.setHeader('Retry-After', String(rateState.retryAfterSeconds));
+      return res.status(429).json({ error: 'too many requests' });
     }
-    if (error.message === 'too large') {
-      return res.status(413).json({ error: 'too large' });
+
+    if (hasRecentFailure(target)) {
+      return res.status(502).json({ error: 'recent fetch failed' });
     }
-    return res.status(502).json({ error: 'fetch failed' });
-  }
+
+    let parsed;
+    try {
+      parsed = new URL(target);
+    } catch {
+      return res.status(400).json({ error: 'invalid url' });
+    }
+
+    try {
+      const cached = readCachedResponse(target);
+      return sendResponse(res, cached || await loadResponse(target, parsed));
+    } catch (error) {
+      if (error.statusCode === 503) {
+        res.setHeader('Retry-After', '1');
+        return res.status(503).json({ error: 'proxy busy' });
+      }
+      recordFailure(target);
+      if (error.message === 'blocked host' || error.message === 'unsupported protocol') {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error.message === 'too large') {
+        return res.status(413).json({ error: 'too large' });
+      }
+      if (error.statusCode === 415) return res.status(415).json({ error: 'not an image' });
+      console.error(`[Icon Proxy] ${target} -> ${error.message}`);
+      return res.status(502).json({ error: 'fetch failed' });
+    }
+  };
 };

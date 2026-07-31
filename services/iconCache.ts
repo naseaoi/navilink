@@ -10,6 +10,7 @@ const STORE_NAME = 'icons';
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天
 const MAX_ENTRIES = 500;
 const MAX_MEMORY_ENTRIES = 500;
+const TOUCH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 interface MemoryIcon {
   src: string;
@@ -29,6 +30,7 @@ interface IconRecord {
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+let capacityCheckScheduled = false;
 
 /** 打开/创建 IndexedDB(单例) */
 const openDB = (): Promise<IDBDatabase> => {
@@ -75,8 +77,7 @@ const writeRecord = async (record: IconRecord): Promise<void> => {
   return new Promise((resolve, reject) => {
     const req = store.put(record);
     req.onsuccess = () => {
-      // 异步触发淘汰,不阻塞写入完成
-      enforceCapacity().catch(() => {});
+      scheduleCapacityCheck();
       resolve();
     };
     req.onerror = () => reject(req.error);
@@ -85,6 +86,7 @@ const writeRecord = async (record: IconRecord): Promise<void> => {
 
 /** 更新 lastUsed(命中时调用) */
 const touchRecord = async (record: IconRecord): Promise<void> => {
+  if (Date.now() - record.lastUsed < TOUCH_INTERVAL_MS) return;
   record.lastUsed = Date.now();
   const store = await tx('readwrite');
   store.put(record);
@@ -107,6 +109,15 @@ const enforceCapacity = async (): Promise<void> => {
       cursor.continue();
     };
   };
+};
+
+const scheduleCapacityCheck = () => {
+  if (capacityCheckScheduled) return;
+  capacityCheckScheduled = true;
+  setTimeout(() => {
+    capacityCheckScheduled = false;
+    enforceCapacity().catch(() => {});
+  }, 0);
 };
 
 /** 通过后端代理拉取图标,避免跨域 CORS 限制 */

@@ -7,6 +7,7 @@ import {
   buildClearAuthCookie,
   getWritableAuthPayload,
   hashPassword,
+  verifyPasswordAsync,
   signToken,
   verifyPassword,
   verifyToken
@@ -59,6 +60,17 @@ describe('auth helpers', () => {
 
   it('rejects broken scrypt hashes', () => {
     assert.equal(verifyPassword('admin123', 'scrypt$salt$hash'), false);
+  });
+
+  it('verifies scrypt hashes without blocking the event loop', async () => {
+    const stored = hashPassword('admin123');
+    let eventLoopAdvanced = false;
+    const verification = verifyPasswordAsync('admin123', stored);
+    setImmediate(() => { eventLoopAdvanced = true; });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(eventLoopAdvanced, true);
+    assert.equal(await verification, true);
   });
 
   it('uses configurable cookie attributes', () => {

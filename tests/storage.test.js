@@ -74,7 +74,7 @@ describe('storage initialization', () => {
     }
   });
 
-  it('caches public reads in WebDAV mode', async () => {
+  it('coalesces concurrent public reads in WebDAV mode', async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'navilink-webdav-cache-'));
     const originalFetch = global.fetch;
     const previousWebDavEnv = {
@@ -88,6 +88,7 @@ describe('storage initialization', () => {
     let reads = 0;
     global.fetch = async () => {
       reads += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
       return new Response(JSON.stringify({ ...createDefaultPublicData(), _meta: { updatedAt: 10 } }), {
         status: 200,
         headers: { ETag: '"public-v1"' }
@@ -102,9 +103,9 @@ describe('storage initialization', () => {
         defaultPrivateData: { admin: { username: 'admin', passwordHash: 'unused' } },
         publicCacheTtlMs: 60_000
       });
-      await storage.readPublicOrDefault();
-      await storage.readPublicOrDefault();
+      const results = await Promise.all(Array.from({ length: 8 }, () => storage.readPublicOrDefault()));
       assert.equal(reads, 1);
+      assert.equal(results.every((result) => result._meta.updatedAt === 10), true);
     } finally {
       global.fetch = originalFetch;
       Object.entries(previousWebDavEnv).forEach(([key, value]) => {

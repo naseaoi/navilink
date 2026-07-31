@@ -1,4 +1,4 @@
-import { getAuthPayload, getWritableAuthPayload, normalizePrivateData } from './_shared/auth.js';
+import { getAuthPayload, getWritableAuthPayload, normalizePrivateDataAsync } from './_shared/auth.js';
 import { createDefaultPublicData } from './_shared/defaultData.js';
 import { getRequestedDataFile, withTimestamp } from './_shared/data.js';
 import { hasWebDavConfig, putWebDavJson } from './_shared/webdav.js';
@@ -50,7 +50,7 @@ export default async function handler(request, response) {
     let body;
     if (method === 'PUT') {
       const validated = validateDataFilePayload(fileName, request.body);
-      const bodyData = isPrivate ? normalizePrivateData(validated) : validated;
+      const bodyData = isPrivate ? await normalizePrivateDataAsync(validated) : validated;
       body = withTimestamp(fileName, bodyData);
     }
 

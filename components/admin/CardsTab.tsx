@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Edit2, GripVertical, Plus, Sparkles, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Edit2, GripVertical, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Button, Input, Modal, Select } from '../UI';
 import { LinkCard, PublicData } from '../../types';
 import { CachedIcon } from '../public/CachedIcon';
@@ -12,6 +12,7 @@ interface CardsTabProps {
 
 const PREVIEW_URL_PATH = '/navilink-preview/';
 const MAX_PREVIEW_COUNT = 60;
+const PAGE_SIZE = 100;
 
 const isHttpUrl = (value: string) => {
   try {
@@ -37,24 +38,36 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   const [filterCat, setFilterCat] = useState('all');
   const [previewCount, setPreviewCount] = useState(12);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const dragOrderRef = useRef<string[] | null>(null);
+  const dragChangedRef = useRef(false);
 
-  const filtered = filterCat === 'all' ? data.cards : data.cards.filter((card) => card.categoryId === filterCat);
-  const sorted = [...filtered].sort((a, b) => a.order - b.order);
-  const categoryOptions = data.categories.map((category) => ({ value: category.id, label: category.name }));
-  const invalidCards = data.cards.filter((card) => !isHttpUrl(card.url) || (card.icon?.trim() && !isHttpUrl(card.icon.trim())));
-  const previewCards = data.cards.filter(isPreviewCard);
+  const filtered = useMemo(
+    () => filterCat === 'all' ? data.cards : data.cards.filter((card) => card.categoryId === filterCat),
+    [data.cards, filterCat]
+  );
+  const baseSorted = useMemo(() => [...filtered].sort((a, b) => a.order - b.order), [filtered]);
+  const sorted = useMemo(() => {
+    if (!dragOrder) return baseSorted;
+    const cardsById = new Map(baseSorted.map((card) => [card.id, card]));
+    return dragOrder.map((id) => cardsById.get(id)).filter((card): card is LinkCard => !!card);
+  }, [baseSorted, dragOrder]);
+  const categoryOptions = useMemo(
+    () => data.categories.map((category) => ({ value: category.id, label: category.name })),
+    [data.categories]
+  );
+  const invalidCards = useMemo(
+    () => data.cards.filter((card) => !isHttpUrl(card.url) || (card.icon?.trim() && !isHttpUrl(card.icon.trim()))),
+    [data.cards]
+  );
+  const previewCards = useMemo(() => data.cards.filter(isPreviewCard), [data.cards]);
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const pageCards = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const reorderCards = (targetId?: string) => {
-    if (!draggedId) return data.cards;
-    const scope = [...sorted];
-    const fromIndex = scope.findIndex((card) => card.id === draggedId);
-    if (fromIndex === -1) return data.cards;
-    const targetIndex = targetId ? scope.findIndex((card) => card.id === targetId) : fromIndex;
-    if (targetIndex === -1) return data.cards;
-    const [moved] = scope.splice(fromIndex, 1);
-    scope.splice(targetIndex, 0, moved);
-    const orderById = new Map(scope.map((card, index) => [card.id, index]));
+  const applyCardOrder = (order: string[]) => {
+    const orderById = new Map(order.map((id, index) => [id, index]));
     return data.cards.map((card) => orderById.has(card.id) ? { ...card, order: orderById.get(card.id)! } : card);
   };
 
@@ -64,16 +77,36 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  const onDragStart = (id: string) => setDraggedId(id);
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [filterCat]);
+
+  const beginDrag = (id: string) => {
+    const order = baseSorted.map((card) => card.id);
+    dragOrderRef.current = order;
+    dragChangedRef.current = false;
+    setDragOrder(order);
+    setDraggedId(id);
+  };
 
   const onDragEnter = (targetId: string) => {
     if (!draggedId || draggedId === targetId) return;
-
-    onChange({ ...data, cards: reorderCards(targetId) });
+    const order = [...(dragOrderRef.current || baseSorted.map((card) => card.id))];
+    const fromIndex = order.indexOf(draggedId);
+    const targetIndex = order.indexOf(targetId);
+    if (fromIndex === -1 || targetIndex === -1) return;
+    order.splice(targetIndex, 0, order.splice(fromIndex, 1)[0]);
+    dragOrderRef.current = order;
+    dragChangedRef.current = true;
+    setDragOrder(order);
   };
 
   const handleTouchStart = (_e: React.TouchEvent, id: string) => {
-    setDraggedId(id);
+    beginDrag(id);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -92,7 +125,12 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   };
 
   const handleTouchEnd = () => {
-    onChange({ ...data, cards: reorderCards() });
+    if (dragOrderRef.current && dragChangedRef.current) {
+      onChange({ ...data, cards: applyCardOrder(dragOrderRef.current) });
+    }
+    dragOrderRef.current = null;
+    dragChangedRef.current = false;
+    setDragOrder(null);
     setDraggedId(null);
   };
 
@@ -185,7 +223,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-x-6 gap-y-6">
-        {sorted.map(card => (
+        {pageCards.map(card => (
           <div 
             key={card.id} 
             data-card-id={card.id}
@@ -200,7 +238,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
           >
             <div 
               draggable 
-              onDragStart={()=>onDragStart(card.id)} 
+              onDragStart={()=>beginDrag(card.id)}
               onDragEnd={handleTouchEnd}
               onTouchStart={(e) => handleTouchStart(e, card.id)}
               onTouchMove={handleTouchMove}
@@ -247,6 +285,30 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
           </div>
         ))}
       </div>
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <Button
+            variant="secondary"
+            size="icon"
+            disabled={page === 0 || !!draggedId}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+            title="上一页"
+          >
+            <ChevronLeft size={17} />
+          </Button>
+          <span className="min-w-16 text-center text-xs font-medium text-2">{page + 1} / {pageCount}</span>
+          <Button
+            variant="secondary"
+            size="icon"
+            disabled={page >= pageCount - 1 || !!draggedId}
+            onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+            title="下一页"
+          >
+            <ChevronRight size={17} />
+          </Button>
+        </div>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} title={editingCard.id?.startsWith('card_') ? "编辑项目" : "新增项目"}>
         <div className="space-y-4">

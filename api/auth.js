@@ -1,6 +1,6 @@
 import {
   buildClearAuthCookie,
-  createDefaultPrivateData,
+  createDefaultPrivateDataAsync,
   getAuthPayload
 } from './_shared/auth.js';
 import { loginAdmin } from './_shared/authService.js';
@@ -53,7 +53,7 @@ export default async function handler(request, response) {
       readPrivateData: async () => {
         const privateData = await fetchWebDavJson('private.json', env);
         if (privateData) return privateData;
-        const defaultPrivateData = createDefaultPrivateData();
+        const defaultPrivateData = await createDefaultPrivateDataAsync();
         await putWebDavJson('private.json', withTimestamp('private.json', defaultPrivateData), env);
         return defaultPrivateData;
       },

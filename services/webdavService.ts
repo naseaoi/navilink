@@ -37,13 +37,22 @@ const DEFAULT_PUBLIC_DATA: PublicData = {
 
 class WebDavService {
   private publicDataSource: 'api' | 'localStorage' | 'default' = 'api';
+  private cachedPublicData: PublicData | null | undefined;
 
   getPublicDataSource(): 'api' | 'localStorage' | 'default' {
     return this.publicDataSource;
   }
 
   getCachedPublicData(): PublicData | null {
-    return readPublicDataCache(PUBLIC_CACHE_KEY);
+    if (this.cachedPublicData === undefined) {
+      this.cachedPublicData = readPublicDataCache(PUBLIC_CACHE_KEY);
+    }
+    return this.cachedPublicData;
+  }
+
+  private cachePublicData(data: PublicData): void {
+    this.cachedPublicData = data;
+    writePublicDataCache(PUBLIC_CACHE_KEY, data);
   }
 
   async getStorageMode(): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
@@ -90,7 +99,7 @@ class WebDavService {
   }
 
   async fetchPublicData({ forceRefresh = false }: { forceRefresh?: boolean } = {}): Promise<PublicData> {
-    const cached = readPublicDataCache(PUBLIC_CACHE_KEY);
+    const cached = this.getCachedPublicData();
     try {
       const endpoint = forceRefresh
         ? '/api/webdav?file=public.json&fresh=1'
@@ -109,7 +118,7 @@ class WebDavService {
         this.publicDataSource = 'localStorage';
         return cached;
       }
-      writePublicDataCache(PUBLIC_CACHE_KEY, data);
+      this.cachePublicData(data);
       this.publicDataSource = 'api';
       return data;
     } catch {
@@ -132,7 +141,7 @@ class WebDavService {
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error('Failed to save via API');
-    writePublicDataCache(PUBLIC_CACHE_KEY, data);
+    this.cachePublicData(data);
   }
 
   async fetchPrivateData(): Promise<PrivateData> {
@@ -191,7 +200,7 @@ class WebDavService {
     if (response.status === 409) throw new Error('DATA_CONFLICT');
     if (!response.ok) throw new Error('Failed to save data');
     const result: { publicData: PublicData; privateData: PrivateData } = await response.json();
-    writePublicDataCache(PUBLIC_CACHE_KEY, result.publicData);
+    this.cachePublicData(result.publicData);
     return result;
   }
 }

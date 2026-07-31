@@ -51,7 +51,7 @@ const GroupCard: React.FC<{
   const visibleCards = cards.slice(0, PREVIEW_COUNT);
 
   return (
-    <section className="flex flex-col rounded-3xl border border-[rgb(var(--border-subtle)/0.58)] bg-surface/95 p-6 shadow-[0_12px_34px_-28px_rgb(15_23_42/0.34)] transition-colors duration-300 hover:border-[rgb(var(--border-default)/0.58)] dark:border-[rgb(var(--border-default)/0.36)] dark:shadow-[0_14px_38px_-30px_rgb(0_0_0/0.72)] md:p-6">
+    <section className="render-section flex flex-col rounded-3xl border border-[rgb(var(--border-subtle)/0.58)] bg-surface/95 p-6 shadow-[0_12px_34px_-28px_rgb(15_23_42/0.34)] transition-colors duration-300 hover:border-[rgb(var(--border-default)/0.58)] dark:border-[rgb(var(--border-default)/0.36)] dark:shadow-[0_14px_38px_-30px_rgb(0_0_0/0.72)] md:p-6">
       <button
         type="button"
         onClick={() => navigate(categoryPath(category.id))}
