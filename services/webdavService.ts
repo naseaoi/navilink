@@ -1,5 +1,6 @@
 import { PublicData, PrivateData } from '../types';
 import { parsePublicData, readPublicDataCache, writePublicDataCache } from './publicDataCache';
+import { AUTH_SESSION_EXPIRED_EVENT } from './authSession';
 
 const PUBLIC_CACHE_KEY = 'navilink_public';
 
@@ -115,8 +116,7 @@ class WebDavService {
       const cachedVersion = cached?._meta?.updatedAt ?? 0;
       const remoteVersion = data._meta?.updatedAt ?? 0;
       if (!forceRefresh && cached && cachedVersion > remoteVersion) {
-        this.publicDataSource = 'localStorage';
-        return cached;
+        return this.fetchPublicData({ forceRefresh: true });
       }
       this.cachePublicData(data);
       this.publicDataSource = 'api';
@@ -150,6 +150,7 @@ class WebDavService {
       credentials: 'same-origin'
     });
 
+    if (response.status === 401) window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
     if (!response.ok) throw new Error('Failed to load private data');
 
     return await response.json();

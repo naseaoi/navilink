@@ -24,6 +24,7 @@ describe('storage routes', () => {
     const routes = {};
     const publicData = { settings: { title: 'cached', icon: '' }, categories: [], cards: [] };
     let publicReads = 0;
+    let readOptions;
     const app = {
       all: (path, handler) => { routes[`ALL ${path}`] = handler; },
       get: (path, handler) => { routes[`GET ${path}`] = handler; },
@@ -31,8 +32,9 @@ describe('storage routes', () => {
       post: (path, handler) => { routes[`POST ${path}`] = handler; }
     };
     const storage = {
-      readPublicOrDefault: async () => {
+      readPublicOrDefault: async (options) => {
         publicReads += 1;
+        readOptions = options;
         return publicData;
       }
     };
@@ -44,5 +46,8 @@ describe('storage routes', () => {
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body, publicData);
     assert.equal(publicReads, 1);
+    assert.deepEqual(readOptions, { forceRefresh: false });
+    await routes['ALL /api/webdav']({ method: 'GET', query: { file: 'public.json', fresh: '1' } }, createResponse());
+    assert.deepEqual(readOptions, { forceRefresh: true });
   });
 });

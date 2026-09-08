@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { createBrowserRouter, RouterProvider, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PublicView } from './components/PublicView';
 import { HomePage } from './components/public/HomePage';
 import { CategoryPage } from './components/public/CategoryPage';
@@ -7,6 +7,7 @@ import { AdminLogin } from './components/admin/AdminLogin';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useTheme } from './hooks/useTheme';
 import {
+  AUTH_SESSION_EXPIRED_EVENT,
   logoutAuthSession,
   verifyAuthSession
 } from './services/authSession';
@@ -31,30 +32,44 @@ const MainApp = () => {
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'anonymous'>('checking');
   const [verifiedAdminEntryKey, setVerifiedAdminEntryKey] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [isRefreshingPublic, setIsRefreshingPublic] = useState(false);
+  const publicLoadPending = useRef(false);
   const { theme, toggleTheme } = useTheme();
 
   usePageMeta(state.publicData.settings.title, state.publicData.settings.icon);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const pub = await webdav.fetchPublicData();
-        const source = webdav.getPublicDataSource();
-        const error = source === 'api' ? null : source === 'localStorage' ? '正在使用本地缓存' : '正在使用默认数据';
-        setState((prev) => {
-          const previousVersion = prev.publicData._meta?.updatedAt;
-          const nextVersion = pub._meta?.updatedAt;
-          if (prev.hasFetchedPublicData && prev.error === error && previousVersion && previousVersion === nextVersion) {
-            return prev;
-          }
-          return { ...prev, publicData: pub, hasFetchedPublicData: true, error };
-        });
-      } catch (e) {
-        setState(prev => ({ ...prev, hasFetchedPublicData: true, error: '无法同步远程数据' }));
-      }
-    };
-    init();
+  const loadPublicData = useCallback(async (forceRefresh = false) => {
+    if (publicLoadPending.current) return;
+    publicLoadPending.current = true;
+    setIsRefreshingPublic(true);
+    try {
+      const pub = await webdav.fetchPublicData({ forceRefresh });
+      const source = webdav.getPublicDataSource();
+      const error = source === 'api' ? null : source === 'localStorage' ? '正在使用本地缓存' : '正在使用默认数据';
+      setState((prev) => {
+        if (prev.hasFetchedPublicData && prev.error === error && prev.publicData === pub) return prev;
+        return { ...prev, publicData: pub, hasFetchedPublicData: true, error };
+      });
+    } catch {
+      setState(prev => ({ ...prev, hasFetchedPublicData: true, error: '无法同步远程数据' }));
+    } finally {
+      publicLoadPending.current = false;
+      setIsRefreshingPublic(false);
+    }
   }, []);
+
+  useEffect(() => { void loadPublicData(); }, [loadPublicData]);
+
+  useEffect(() => {
+    const expireSession = () => {
+      setPrivateData(null);
+      setAuthState('anonymous');
+      setMustChangePassword(false);
+      void loadPublicData(true);
+    };
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, expireSession);
+    return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, expireSession);
+  }, [loadPublicData]);
 
   useEffect(() => {
     if (location.pathname !== '/tat') return;
@@ -108,7 +123,7 @@ const MainApp = () => {
 
   return (
     <Routes>
-      <Route element={<PublicView data={state.publicData} hasFetchedData={state.hasFetchedPublicData} dataStatus={state.error} theme={theme} onToggleTheme={toggleTheme} />}>
+      <Route element={<PublicView data={state.publicData} hasFetchedData={state.hasFetchedPublicData} dataStatus={state.error} theme={theme} onToggleTheme={toggleTheme} onRetryData={() => void loadPublicData(true)} isRefreshingData={isRefreshingPublic} />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/c/:categoryId" element={<CategoryPage />} />
       </Route>
@@ -142,10 +157,8 @@ const MainApp = () => {
   );
 };
 
+const router = createBrowserRouter([{ path: '*', element: <MainApp /> }]);
+
 export default function App() {
-  return (
-    <BrowserRouter>
-      <MainApp />
-    </BrowserRouter>
-  );
+  return <RouterProvider router={router} />;
 }

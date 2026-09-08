@@ -52,7 +52,7 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav, au
 
     if (!isPrivate) {
       try {
-        return res.json(await storage.readPublicOrDefault());
+        return res.json(await storage.readPublicOrDefault({ forceRefresh: req.query.fresh === '1' }));
       } catch (error) {
         console.error(`[Storage Read Error] ${error.message}`);
         return res.status(500).json({ error: 'Storage Read Error' });

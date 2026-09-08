@@ -15,6 +15,7 @@ import { useAdminDraft } from '../hooks/useAdminDraft';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import { useStorageStatus } from '../hooks/useStorageStatus';
 import { useToasts } from '../hooks/useToasts';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 interface AdminDashboardProps {
   publicData: PublicData;
@@ -49,6 +50,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
     replaceDraft,
     clearChanges
   } = useAdminDraft({ publicData, privateData });
+  const leaveGuard = useUnsavedChanges(hasChanges);
   const {
     storageMode,
     storageAvailable,
@@ -138,6 +140,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   return (
     <div className="fixed inset-0 h-screen w-screen flex flex-col md:flex-row bg-canvas overflow-hidden font-sans text-1">
       <ToastContainer messages={toasts} onRemove={removeToast} />
+      <ConfirmModal
+        isOpen={leaveGuard.isOpen} onClose={leaveGuard.cancelLeave} onConfirm={leaveGuard.confirmLeave}
+        title="放弃未保存更改" message="离开后台会丢失未保存的更改。" variant="danger" closeOnConfirm={false}
+      />
       <ConfirmModal 
         isOpen={confirmConfig.isOpen} onClose={closeConfirm} 
         onConfirm={confirmConfig.onConfirm} title={confirmConfig.title} message={confirmConfig.message} variant={confirmConfig.variant}
@@ -150,7 +156,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           mustChangePassword={mustChangePassword}
           onTabChange={setActiveTab}
           onGoHome={() => navigate('/')}
-          onLogout={onLogout}
+          onLogout={() => leaveGuard.requestLeave(onLogout)}
         />
       </aside>
 
@@ -165,7 +171,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
                mustChangePassword={mustChangePassword}
                onTabChange={setActiveTab}
                onGoHome={() => navigate('/')}
-               onLogout={onLogout}
+               onLogout={() => leaveGuard.requestLeave(onLogout)}
                onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
              />
           </aside>

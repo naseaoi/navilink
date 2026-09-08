@@ -14,9 +14,11 @@ interface PublicViewProps {
   dataStatus?: string | null;
   theme?: 'light' | 'dark' | 'system';
   onToggleTheme?: () => void;
+  onRetryData?: () => void;
+  isRefreshingData?: boolean;
 }
 
-export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, dataStatus, theme = 'system', onToggleTheme }) => {
+export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, dataStatus, theme = 'system', onToggleTheme, onRetryData, isRefreshingData }) => {
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,11 +96,10 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
 
       {dataStatus && (
         <div
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none fixed left-1/2 top-16 z-50 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-control border border-amber-200 bg-amber-50/95 px-3 py-1.5 text-[12px] font-medium text-amber-700 shadow-soft backdrop-blur-md dark:border-amber-900/50 dark:bg-amber-950/90 dark:text-amber-300 md:left-[calc(50%+124px)] md:top-6"
+          className="fixed left-1/2 top-16 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-control border border-amber-200 bg-amber-50/95 px-3 py-1.5 text-[12px] font-medium text-amber-700 shadow-soft backdrop-blur-md dark:border-amber-900/50 dark:bg-amber-950/90 dark:text-amber-300 md:left-[calc(50%+124px)] md:top-6"
         >
-          {dataStatus}
+          <span role="status" aria-live="polite">{dataStatus}</span>
+          {onRetryData && <button type="button" onClick={onRetryData} disabled={isRefreshingData} className="shrink-0 rounded px-1 py-1 underline underline-offset-2 disabled:opacity-50">重新同步</button>}
         </div>
       )}
 

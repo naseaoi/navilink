@@ -175,11 +175,12 @@ test.describe.serial('核心流程', () => {
     await page.getByRole('button', { name: '登录', exact: true }).click();
     await expect(page.getByRole('heading', { name: '卡片管理', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '数据存储', exact: true }).click();
+    const previousFreshReads = freshPublicReads;
     await page.getByRole('button', { name: '本地存储', exact: true }).click();
     await page.getByRole('button', { name: 'WebDAV', exact: true }).click();
 
     await expect(page).toHaveTitle('WebDAV 旧版本');
-    expect(freshPublicReads).toBe(1);
+    expect(freshPublicReads).toBe(previousFreshReads + 1);
   });
 
   test('新增卡片保存后重新加载仍存在', async ({ page }) => {

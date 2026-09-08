@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { fetchWebDavJson, fetchWebDavJsonWithMeta, putWebDavJson, putWebDavJsonBatch } from '../api/_shared/webdav.js';
 import { getUpdatedAt, withTimestamp } from '../api/_shared/data.js';
 import { prepareSaveData } from '../api/_shared/saveData.js';
+import { createPublicDataCache } from './publicDataCache.js';
 
 export const createStorageService = ({
   dataDir,
@@ -19,18 +20,13 @@ export const createStorageService = ({
     mkdirSync(dataDir, { recursive: true });
   }
 
-  const memoryCache = {
-    'public.json': null,
-    'private.json': null
-  };
   const parsedPublicCacheTtlMs = Number(publicCacheTtlMs);
   const effectivePublicCacheTtlMs = Number.isSafeInteger(parsedPublicCacheTtlMs)
     && parsedPublicCacheTtlMs >= 0
     && parsedPublicCacheTtlMs <= 300_000
     ? parsedPublicCacheTtlMs
     : 15_000;
-  let publicCacheExpiresAt = 0;
-  let publicReadInFlight = null;
+  const publicCache = createPublicDataCache(effectivePublicCacheTtlMs);
   let writeQueue = Promise.resolve();
 
   const runWrite = (operation) => {
@@ -39,9 +35,8 @@ export const createStorageService = ({
     return result;
   };
 
-  const updateMemoryCache = (fileName, data) => {
-    memoryCache[fileName] = data;
-    if (fileName === 'public.json') publicCacheExpiresAt = Date.now() + effectivePublicCacheTtlMs;
+  const updateMemoryCache = (mode, fileName, data) => {
+    if (fileName === 'public.json') publicCache.store(mode, data);
   };
 
   const readLocalJson = async (filePath) => {
@@ -128,10 +123,10 @@ export const createStorageService = ({
 
   const setStorageMode = (mode) => runWrite(async () => {
     const nextMode = normalizeStorageMode(mode);
-    storageModeCache = nextMode === 'webdav' && !useWebDav ? 'local' : nextMode;
-    await writeLocalJsonAtomic(storageConfigPath, { mode: storageModeCache });
-    memoryCache['public.json'] = null;
-    publicCacheExpiresAt = 0;
+    const availableMode = nextMode === 'webdav' && !useWebDav ? 'local' : nextMode;
+    await writeLocalJsonAtomic(storageConfigPath, { mode: availableMode });
+    storageModeCache = availableMode;
+    publicCache.invalidate();
     return storageModeCache;
   });
 
@@ -147,7 +142,7 @@ export const createStorageService = ({
     } else {
       await writeLocalJsonAtomic(path.join(dataDir, fileName), payload);
     }
-    updateMemoryCache(fileName, payload);
+    updateMemoryCache(mode, fileName, payload);
     return payload;
   };
 
@@ -185,7 +180,7 @@ export const createStorageService = ({
       })));
     }
     payloads.forEach(({ fileName, data }) => {
-      updateMemoryCache(fileName, data);
+      updateMemoryCache(mode, fileName, data);
     });
     return Object.fromEntries(payloads.map(({ fileName, data }) => [fileName, data]));
   };
@@ -229,22 +224,16 @@ export const createStorageService = ({
     return { mode, privateData };
   };
 
-  const readPublicOrDefault = async () => {
-    if (memoryCache['public.json'] && publicCacheExpiresAt > Date.now()) {
-      return memoryCache['public.json'];
-    }
-    if (publicReadInFlight) return publicReadInFlight;
-    publicReadInFlight = (async () => {
+  const readPublicOrDefault = async ({ forceRefresh = false } = {}) => {
+    while (true) {
       const mode = await getStorageMode();
-      let publicData = await readDataFromStorage(mode, 'public.json');
-      if (!publicData) publicData = await writeDataToStorage(mode, 'public.json', defaultPublicData);
-      else updateMemoryCache('public.json', publicData);
-      return publicData;
-    })();
-    try {
-      return await publicReadInFlight;
-    } finally {
-      publicReadInFlight = null;
+      const publicData = await publicCache.read(mode, async () => {
+        const stored = await readDataFromStorage(mode, 'public.json');
+        if (stored) return stored;
+        if (mode !== await getStorageMode()) return undefined;
+        return writeDataToStorage(mode, 'public.json', defaultPublicData);
+      }, { forceRefresh });
+      if (publicData !== undefined && mode === await getStorageMode()) return publicData;
     }
   };
 
@@ -267,10 +256,8 @@ export const createStorageService = ({
     try {
       if (req.method === 'GET') {
         if (fileName === 'public.json') return res.json(await readPublicOrDefault());
-        if (memoryCache[fileName]) return res.json(memoryCache[fileName]);
         const jsonData = await readLocalJson(filePath);
         if (!jsonData) return res.status(404).json({ error: 'File not found' });
-        updateMemoryCache(fileName, jsonData);
         return res.json(jsonData);
       }
       if (req.method === 'PUT') {

@@ -1,3 +1,5 @@
+export const AUTH_SESSION_EXPIRED_EVENT = 'navilink:session-expired';
+
 export interface AuthSession {
   authenticated: boolean;
   exp?: number;

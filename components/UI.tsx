@@ -145,7 +145,7 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string }> =
   </div>
 );
 
-export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; message: string; variant?: 'danger' | 'primary'; }> = ({ isOpen, onClose, onConfirm, title, message, variant = 'primary' }) => {
+export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; message: string; variant?: 'danger' | 'primary'; closeOnConfirm?: boolean }> = ({ isOpen, onClose, onConfirm, title, message, variant = 'primary', closeOnConfirm = true }) => {
   if (!isOpen) return null;
   return createPortal((
     <div
@@ -161,7 +161,7 @@ export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onCo
         <p className="text-2 text-[13px] mb-6 leading-relaxed">{message}</p>
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={onClose}>取消</Button>
-          <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); onClose(); }}>确认</Button>
+          <Button variant={variant} className="flex-1" onClick={() => { onConfirm(); if (closeOnConfirm) onClose(); }}>确认</Button>
         </div>
       </div>
     </div>
