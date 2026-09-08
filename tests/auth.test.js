@@ -5,10 +5,10 @@ import logoutHandler from '../api/auth/logout.js';
 import {
   buildAuthCookie,
   buildClearAuthCookie,
-  getWritableAuthPayload,
   hashPassword,
   verifyPasswordAsync,
   signToken,
+  signSessionToken,
   verifyPassword,
   verifyToken
 } from '../api/_shared/auth.js';
@@ -16,6 +16,7 @@ import { loginAdmin } from '../api/_shared/authService.js';
 import { createLoginRateLimiter } from '../api/_shared/rateLimit.js';
 import { changeAdminPassword } from '../api/_shared/passwordService.js';
 import { registerAuthRoutes } from '../server/authRoutes.js';
+import { getWritableAuthPayload } from '../api/_shared/session.js';
 
 const createRequest = () => ({ headers: {}, ip: '127.0.0.1' });
 
@@ -97,23 +98,31 @@ describe('auth helpers', () => {
     }
   });
 
-  it('rejects storage writes until the default password is changed', () => {
-    const token = signToken({ username: 'admin', exp: Date.now() + 1000, mustChangePassword: true }, 'secret');
+  it('rejects storage writes until the default password is changed', async () => {
+    const privateData = { admin: { username: 'admin', passwordHash: hashPassword('admin123') } };
+    const token = signSessionToken({ exp: Date.now() + 1000, mustChangePassword: true }, privateData, 'secret');
     const request = { headers: { authorization: `Bearer ${token}` } };
-    assert.equal(getWritableAuthPayload(request, 'secret').error, 'PASSWORD_CHANGE_REQUIRED');
+    assert.equal((await getWritableAuthPayload(request, 'secret', async () => privateData)).error, 'PASSWORD_CHANGE_REQUIRED');
   });
 
-  it('supports dedicated Vercel verify and logout endpoints', async () => {
+  it('supports dedicated Vercel verify and logout endpoints', async (context) => {
     const previousSecret = process.env.AUTH_SECRET;
+    const previousUrl = process.env.WEBDAV_URL;
     process.env.AUTH_SECRET = 'endpoint-secret';
+    process.env.WEBDAV_URL = 'https://dav.example.invalid';
+    const privateData = { admin: { username: 'admin', passwordHash: hashPassword('admin123') } };
+    context.mock.method(globalThis, 'fetch', async () => Response.json(privateData));
     try {
-      const token = signToken({ username: 'admin', exp: Date.now() + 60_000 }, 'endpoint-secret');
+      const token = signSessionToken({ exp: Date.now() + 60_000 }, privateData, 'endpoint-secret');
       const routes = {};
       const app = {
         get: (path, handler) => { routes[`GET ${path}`] = handler; },
         post: (path, handler) => { routes[`POST ${path}`] = handler; }
       };
-      registerAuthRoutes({ app, authSecret: 'endpoint-secret', loginRateLimiter: {}, storage: {} });
+      registerAuthRoutes({ app, authSecret: 'endpoint-secret', loginRateLimiter: {}, storage: {
+        getStorageMode: async () => 'local',
+        readDataFromStorage: async () => privateData
+      } });
 
       const verifyResponse = createResponse();
       const verifyRequest = { method: 'GET', headers: { cookie: `navilink_session=${token}` } };
@@ -134,6 +143,8 @@ describe('auth helpers', () => {
       assert.deepEqual(expressLogoutResponse.body, logoutResponse.body);
       assert.equal(expressLogoutResponse.headers['Set-Cookie'], logoutResponse.headers['Set-Cookie']);
     } finally {
+      if (previousUrl === undefined) delete process.env.WEBDAV_URL;
+      else process.env.WEBDAV_URL = previousUrl;
       if (previousSecret === undefined) delete process.env.AUTH_SECRET;
       else process.env.AUTH_SECRET = previousSecret;
     }

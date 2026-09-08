@@ -1,4 +1,4 @@
-import { DEFAULT_ADMIN_PASSWORD, buildAuthCookie, hashPasswordAsync, signToken } from './auth.js';
+import { DEFAULT_ADMIN_PASSWORD, buildAuthCookie, hashPasswordAsync, signSessionToken } from './auth.js';
 import { withTimestamp } from './data.js';
 import { validatePasswordChangePayload } from './validation.js';
 
@@ -24,7 +24,7 @@ export const changeAdminPassword = async ({ body, authPayload, authSecret, write
   });
   await writePrivateData(privateData);
   const exp = authPayload.exp;
-  const token = signToken({ username: input.username, exp, mustChangePassword: false }, authSecret);
+  const token = signSessionToken({ exp, mustChangePassword: false }, privateData, authSecret);
   return {
     status: 200,
     headers: { 'Set-Cookie': buildAuthCookie(token, exp) },

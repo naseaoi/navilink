@@ -145,7 +145,8 @@ pm2 start server.js --name navilink
 | `PUBLIC_DATA_CDN_TTL_SECONDS` | 否 | `15` | Vercel/CDN 公开数据共享缓存时间（秒，最大 `300`） |
 | `CORS_ORIGINS` | 否 | 空（允许所有） | 允许的跨域来源，逗号分隔 |
 | `LOGIN_WINDOW_MS` | 否 | `60000` | 登录限流时间窗口（毫秒） |
-| `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 窗口内最大登录失败次数 |
+| `LOGIN_MAX_ATTEMPTS` | 否 | `5` | 每 IP 窗口内最大失败及在途登录次数，成功登录后重置 |
+| `LOGIN_MAX_CONCURRENT` | 否 | `4` | 每服务实例同时处理的登录数，最大 `32`，超额返回 `503` |
 | `TRUST_PROXY` | 否 | `loopback` | Express 可信代理范围，公网反向代理部署时按网络拓扑配置 |
 | `COOKIE_SAMESITE` | 否 | `Lax` | Cookie SameSite 策略，支持 `Lax` / `Strict` / `None` |
 | `COOKIE_DOMAIN` | 否 | - | Cookie Domain |
@@ -155,6 +156,8 @@ pm2 start server.js --name navilink
 
 ## 安全说明
 
+- 会话绑定当前管理员凭据；通过密码接口、私有数据保存或批量保存修改账号/密码后，旧会话失效，当前浏览器获得新会话。升级前的旧会话需要重新登录。
+- 登录限流与并发上限按服务实例生效；多实例部署还应在反向代理或平台入口配置统一限流。
 - WebDAV 凭据只在服务端读取，不会注入前端构建产物。
 - `/api/webdav` 只允许访问 `public.json` 和 `private.json`。
 - `/api/storage/save` 会同时保存 `public.json` 和 `private.json`，并基于更新时间与 WebDAV ETag 检测冲突。

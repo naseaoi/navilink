@@ -2,6 +2,8 @@ import { getRequestedDataFile } from '../api/_shared/data.js';
 import { normalizePrivateDataAsync } from '../api/_shared/auth.js';
 import { proxyWebDavDataFile } from '../api/_shared/webdavProxy.js';
 import { validateDataFilePayload } from '../api/_shared/validation.js';
+import { refreshSessionCookie } from '../api/_shared/session.js';
+import { createAsyncRoutes } from './asyncRoutes.js';
 
 const sendValidationError = (res, error) => {
   if (error?.statusCode === 400 || error?.statusCode === 409) {
@@ -11,8 +13,9 @@ const sendValidationError = (res, error) => {
   return res.status(500).json({ error: 'Storage Error' });
 };
 
-export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) => {
-  app.all('/api/webdav', async (req, res) => {
+export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav, authSecret }) => {
+  const routes = createAsyncRoutes(app);
+  routes.all('/api/webdav', async (req, res) => {
     if (!['GET', 'PUT'].includes(req.method)) {
       return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -22,8 +25,9 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
 
     const isPrivate = fileName === 'private.json';
     const isWrite = req.method === 'PUT';
+    let payload;
     if (isPrivate || isWrite) {
-      const payload = requireAuth(req, res, { allowPasswordChangeRequired: isPrivate && !isWrite });
+      payload = await requireAuth(req, res, { allowPasswordChangeRequired: isPrivate && !isWrite });
       if (!payload) return;
     }
 
@@ -38,7 +42,8 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
 
     if (isWrite) {
       try {
-        await storage.writeCurrentData(fileName, req.body);
+        const saved = await storage.writeCurrentData(fileName, req.body);
+        if (isPrivate) refreshSessionCookie(res, payload, saved, authSecret);
         return res.json({ success: true });
       } catch (error) {
         return sendValidationError(res, error);
@@ -68,8 +73,8 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
     return storage.handleLocalStorage(req, res, fileName);
   });
 
-  app.post('/api/storage/save', async (req, res) => {
-    const payload = requireAuth(req, res);
+  routes.post('/api/storage/save', async (req, res) => {
+    const payload = await requireAuth(req, res);
     if (!payload) return;
 
     try {
@@ -78,21 +83,22 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
         privateData: req.body?.privateData,
         expected: req.body?.expected
       });
+      refreshSessionCookie(res, payload, saved['private.json'], authSecret);
       return res.json({ publicData: saved['public.json'], privateData: saved['private.json'] });
     } catch (error) {
       return sendValidationError(res, error);
     }
   });
 
-  app.get('/api/storage/mode', async (req, res) => {
-    const payload = requireAuth(req, res);
+  routes.get('/api/storage/mode', async (req, res) => {
+    const payload = await requireAuth(req, res);
     if (!payload) return;
     const mode = await storage.getStorageMode();
     return res.json({ mode, available: { local: true, webdav: useWebDav } });
   });
 
-  app.get('/api/storage/status', async (req, res) => {
-    const payload = requireAuth(req, res);
+  routes.get('/api/storage/status', async (req, res) => {
+    const payload = await requireAuth(req, res);
     if (!payload) return;
     try {
       return res.json(await storage.readStatus());
@@ -102,8 +108,8 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
     }
   });
 
-  app.put('/api/storage/mode', async (req, res) => {
-    const payload = requireAuth(req, res);
+  routes.put('/api/storage/mode', async (req, res) => {
+    const payload = await requireAuth(req, res);
     if (!payload) return;
     const { mode } = req.body || {};
     if (!mode || !['local', 'webdav'].includes(mode)) return res.status(400).json({ error: 'Invalid mode' });
@@ -112,8 +118,8 @@ export const registerStorageRoutes = ({ app, storage, requireAuth, useWebDav }) 
     return res.json({ mode: next, available: { local: true, webdav: useWebDav } });
   });
 
-  app.post('/api/storage/sync', async (req, res) => {
-    const payload = requireAuth(req, res);
+  routes.post('/api/storage/sync', async (req, res) => {
+    const payload = await requireAuth(req, res);
     if (!payload) return;
     const { from, to } = req.body || {};
     if (!from || !to || !['local', 'webdav'].includes(from) || !['local', 'webdav'].includes(to)) {

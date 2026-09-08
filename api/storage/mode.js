@@ -1,4 +1,4 @@
-import { getWritableAuthPayload } from '../_shared/auth.js';
+import { getWritableAuthPayload } from '../_shared/session.js';
 import { hasWebDavConfig } from '../_shared/webdav.js';
 
 export default async function handler(request, response) {
@@ -8,7 +8,7 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: 'WebDAV environment variables are missing on Vercel.' });
   }
 
-  const auth = getWritableAuthPayload(request, AUTH_SECRET);
+  const auth = await getWritableAuthPayload(request, AUTH_SECRET);
   if (!auth.payload) {
     const status = auth.error === 'PASSWORD_CHANGE_REQUIRED' ? 403 : 401;
     return response.status(status).json({ error: status === 403 ? 'Password change required' : 'Unauthorized', code: auth.error });

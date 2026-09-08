@@ -16,6 +16,7 @@ import { createIconProxyHandler } from './server/iconProxy.js';
 import { createStorageService } from './server/localStorage.js';
 import { createShutdownHandler } from './server/shutdown.js';
 import { registerStorageRoutes } from './server/storageRoutes.js';
+import { sendServerError } from './server/asyncRoutes.js';
 
 // 配置环境
 const __filename = fileURLToPath(import.meta.url);
@@ -129,10 +130,10 @@ const storage = createStorageService({
   defaultPublicData: DEFAULT_PUBLIC_DATA,
   defaultPrivateData: DEFAULT_PRIVATE_DATA
 });
-const requireAuth = createRequireAuth(AUTH_SECRET);
+const requireAuth = createRequireAuth(AUTH_SECRET, storage);
 
 registerAuthRoutes({ app, authSecret: AUTH_SECRET, loginRateLimiter, storage });
-registerStorageRoutes({ app, storage, requireAuth, useWebDav: USE_WEBDAV });
+registerStorageRoutes({ app, storage, requireAuth, useWebDav: USE_WEBDAV, authSecret: AUTH_SECRET });
 
 app.get('/api/icon-proxy', createIconProxyHandler());
 
@@ -145,6 +146,8 @@ app.get('/healthz', (_req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
+
+app.use(sendServerError);
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

@@ -2,7 +2,7 @@ import {
   DEFAULT_ADMIN_PASSWORD,
   buildAuthCookie,
   normalizePrivateDataAsync,
-  signToken,
+  signSessionToken,
   verifyPasswordAsync
 } from './auth.js';
 import { validateLoginPayload } from './validation.js';
@@ -26,40 +26,38 @@ export const loginAdmin = async ({
   }
 
   const { username, password, remember } = loginPayload;
-  loginRateLimiter.cleanup();
-  const rateKeys = loginRateLimiter.getKeys(request, username);
-  const rateState = rateKeys.map(loginRateLimiter.getState).find((state) => state.limited)
-    || { limited: false, retryAfterSeconds: 0 };
-  if (rateState.limited) {
+  const reservation = loginRateLimiter.reserve(request, username);
+  if (!reservation.release) {
     return {
-      status: 429,
-      headers: { 'Retry-After': String(rateState.retryAfterSeconds) },
+      status: reservation.busy ? 503 : 429,
+      headers: { 'Retry-After': String(reservation.retryAfterSeconds) },
       body: { error: 'Too many login attempts, please try again later' }
     };
   }
 
-  const privateData = await readPrivateData();
-  const stored = privateData?.admin?.passwordHash || '';
-  const passwordMatches = await verifyPasswordAsync(password, stored);
-  const isValid = passwordMatches && privateData?.admin?.username === username;
-  if (!isValid) {
-    rateKeys.forEach(loginRateLimiter.recordFailure);
-    return { status: 401, body: { error: 'Invalid credentials' } };
+  try {
+    let privateData = await readPrivateData();
+    const stored = privateData?.admin?.passwordHash || '';
+    const passwordMatches = await verifyPasswordAsync(password, stored);
+    const isValid = passwordMatches && privateData?.admin?.username === username;
+    if (!isValid) return { status: 401, body: { error: 'Invalid credentials' } };
+
+    loginRateLimiter.getKeys(request, username).forEach(loginRateLimiter.clear);
+    const mustChangePassword = password === DEFAULT_ADMIN_PASSWORD;
+    if (stored && !stored.startsWith('scrypt$')) {
+      privateData = await normalizePrivateDataAsync(privateData);
+      await writePrivateData(privateData);
+    }
+
+    const duration = remember ? REMEMBER_SESSION_MS : SESSION_DAY_MS;
+    const exp = Date.now() + duration;
+    const token = signSessionToken({ exp, mustChangePassword }, privateData, authSecret);
+    return {
+      status: 200,
+      headers: { 'Set-Cookie': buildAuthCookie(token, exp) },
+      body: { exp, mustChangePassword }
+    };
+  } finally {
+    reservation.release();
   }
-
-  rateKeys.forEach(loginRateLimiter.clear);
-  const mustChangePassword = password === DEFAULT_ADMIN_PASSWORD;
-
-  if (stored && !stored.startsWith('scrypt$')) {
-    await writePrivateData(await normalizePrivateDataAsync(privateData));
-  }
-
-  const duration = remember ? REMEMBER_SESSION_MS : SESSION_DAY_MS;
-  const exp = Date.now() + duration;
-  const token = signToken({ username, exp, mustChangePassword }, authSecret);
-  return {
-    status: 200,
-    headers: { 'Set-Cookie': buildAuthCookie(token, exp) },
-    body: { exp, mustChangePassword }
-  };
 };

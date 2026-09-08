@@ -1,4 +1,4 @@
-import { getAuthPayload } from '../_shared/auth.js';
+import { getAuthPayload } from '../_shared/session.js';
 import { changeAdminPassword } from '../_shared/passwordService.js';
 import { fetchWebDavJson, getWebDavEnv, hasWebDavConfig, putWebDavJson } from '../_shared/webdav.js';
 
@@ -8,7 +8,7 @@ export default async function handler(request, response) {
   if (!AUTH_SECRET) return response.status(500).json({ error: 'AUTH_SECRET is missing.' });
   if (!hasWebDavConfig()) return response.status(500).json({ error: 'WebDAV environment variables are missing on Vercel.' });
 
-  const payload = getAuthPayload(request, AUTH_SECRET);
+  const payload = await getAuthPayload(request, AUTH_SECRET);
   if (!payload) return response.status(401).json({ error: 'Unauthorized' });
 
   try {

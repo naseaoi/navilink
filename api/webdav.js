@@ -1,4 +1,5 @@
-import { getAuthPayload, getWritableAuthPayload, normalizePrivateDataAsync } from './_shared/auth.js';
+import { normalizePrivateDataAsync } from './_shared/auth.js';
+import { getAuthPayload, getWritableAuthPayload, refreshSessionCookie } from './_shared/session.js';
 import { createDefaultPublicData } from './_shared/defaultData.js';
 import { getRequestedDataFile, withTimestamp } from './_shared/data.js';
 import { hasWebDavConfig, putWebDavJson } from './_shared/webdav.js';
@@ -25,6 +26,7 @@ export default async function handler(request, response) {
 
   const isPrivate = fileName === 'private.json';
   const isWrite = request.method === 'PUT';
+  let authPayload;
 
   const isCacheablePublicRead = isCacheablePublicDataRequest({
     method: request.method,
@@ -36,12 +38,13 @@ export default async function handler(request, response) {
   if (isPrivate || isWrite) {
     if (!AUTH_SECRET) return response.status(500).json({ error: 'AUTH_SECRET is missing.' });
     const auth = isWrite
-      ? getWritableAuthPayload(request, AUTH_SECRET)
-      : { payload: getAuthPayload(request, AUTH_SECRET), error: 'UNAUTHORIZED' };
+      ? await getWritableAuthPayload(request, AUTH_SECRET)
+      : { payload: await getAuthPayload(request, AUTH_SECRET), error: 'UNAUTHORIZED' };
     if (!auth.payload) {
       const status = auth.error === 'PASSWORD_CHANGE_REQUIRED' ? 403 : 401;
       return response.status(status).json({ error: auth.error === 'PASSWORD_CHANGE_REQUIRED' ? 'Password change required' : 'Unauthorized', code: auth.error });
     }
+    authPayload = auth.payload;
   }
   
   const method = request.method;
@@ -55,6 +58,9 @@ export default async function handler(request, response) {
     }
 
     const result = await proxyWebDavDataFile({ method, fileName, body });
+    if (isWrite && isPrivate && result.status >= 200 && result.status < 300) {
+      refreshSessionCookie(response, authPayload, body, AUTH_SECRET);
+    }
     if (method === 'GET' && fileName === 'public.json' && result.status === 404) {
       const publicData = withTimestamp('public.json', createDefaultPublicData());
       await putWebDavJson('public.json', publicData);

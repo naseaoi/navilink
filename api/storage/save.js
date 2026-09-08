@@ -1,4 +1,4 @@
-import { getWritableAuthPayload } from '../_shared/auth.js';
+import { getWritableAuthPayload, refreshSessionCookie } from '../_shared/session.js';
 import { withTimestamp } from '../_shared/data.js';
 import { prepareSaveData } from '../_shared/saveData.js';
 import { fetchWebDavJsonWithMeta, getWebDavEnv, hasWebDavConfig, putWebDavJsonBatch } from '../_shared/webdav.js';
@@ -11,7 +11,7 @@ export default async function handler(request, response) {
   }
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed' });
 
-  const auth = getWritableAuthPayload(request, AUTH_SECRET);
+  const auth = await getWritableAuthPayload(request, AUTH_SECRET);
   if (!auth.payload) {
     const status = auth.error === 'PASSWORD_CHANGE_REQUIRED' ? 403 : 401;
     return response.status(status).json({ error: status === 403 ? 'Password change required' : 'Unauthorized', code: auth.error });
@@ -53,6 +53,7 @@ export default async function handler(request, response) {
       },
       env
     });
+    refreshSessionCookie(response, auth.payload, savedPrivate, AUTH_SECRET);
     return response.json({ publicData: savedPublic, privateData: savedPrivate });
   } catch (error) {
     if (error?.statusCode === 400 || error?.statusCode === 409) {

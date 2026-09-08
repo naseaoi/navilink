@@ -1,8 +1,9 @@
-import { buildClearAuthCookie, getAuthPayload } from './auth.js';
+import { buildClearAuthCookie } from './auth.js';
+import { getAuthPayload } from './session.js';
 
-export const verifyAuthRequest = (request, authSecret) => {
+export const verifyAuthRequest = async (request, authSecret, readPrivateData) => {
   if (!authSecret) return { status: 500, body: { error: 'AUTH_SECRET is missing.' } };
-  const payload = getAuthPayload(request, authSecret);
+  const payload = await getAuthPayload(request, authSecret, readPrivateData);
   if (!payload) return { status: 401, body: { ok: false } };
   return {
     status: 200,

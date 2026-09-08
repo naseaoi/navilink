@@ -18,7 +18,10 @@ export const signToken = (payload, secret) => {
 export const verifyToken = (token, secret) => {
   try {
     if (!token || !secret) return null;
-    const [body, sig] = token.split('.');
+    if (typeof token !== 'string' || token.length > 4096) return null;
+    const parts = token.split('.');
+    if (parts.length !== 2) return null;
+    const [body, sig] = parts;
     if (!body || !sig) return null;
     const expected = crypto.createHmac('sha256', secret).update(body).digest('base64url');
     const sigBuf = Buffer.from(sig);
@@ -28,7 +31,8 @@ export const verifyToken = (token, secret) => {
     if (!valid) return null;
     const payload = JSON.parse(base64UrlDecode(body));
     if (!payload || typeof payload !== 'object') return null;
-    if (payload.exp && Date.now() > payload.exp) return null;
+    if (!Number.isSafeInteger(payload.exp) || Date.now() >= payload.exp) return null;
+    if (typeof payload.username !== 'string' || !payload.username) return null;
     return payload;
   } catch {
     return null;
@@ -101,31 +105,32 @@ export const createDefaultPrivateDataAsync = async () => ({
 });
 
 export const getAuthToken = (request) => {
-  const header = request.headers.authorization || '';
-  if (header.startsWith('Bearer ')) return header.slice('Bearer '.length);
-  const cookieHeader = request.headers.cookie || '';
-  const cookies = Object.fromEntries(
-    cookieHeader
-      .split(';')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const index = part.indexOf('=');
-        if (index === -1) return [part, ''];
-        return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
-      })
-  );
-  if (cookies[AUTH_COOKIE_NAME]) return cookies[AUTH_COOKIE_NAME];
+  const header = request.headers?.authorization;
+  if (typeof header === 'string' && header.startsWith('Bearer ')) return header.slice('Bearer '.length);
+  const cookieHeader = request.headers?.cookie;
+  if (typeof cookieHeader !== 'string') return null;
+  for (const part of cookieHeader.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator < 0 || part.slice(0, separator).trim() !== AUTH_COOKIE_NAME) continue;
+    try {
+      return decodeURIComponent(part.slice(separator + 1).trim());
+    } catch {
+      return null;
+    }
+  }
   return null;
 };
 
-export const getAuthPayload = (request, secret) => verifyToken(getAuthToken(request), secret);
+export const getCredentialVersion = (privateData, secret) => {
+  const { username, passwordHash } = privateData?.admin || {};
+  if (typeof username !== 'string' || !username || typeof passwordHash !== 'string' || !passwordHash || !secret) return null;
+  return crypto.createHmac('sha256', secret).update(JSON.stringify([username, passwordHash])).digest('base64url');
+};
 
-export const getWritableAuthPayload = (request, secret) => {
-  const payload = getAuthPayload(request, secret);
-  if (!payload) return { payload: null, error: 'UNAUTHORIZED' };
-  if (payload.mustChangePassword) return { payload: null, error: 'PASSWORD_CHANGE_REQUIRED' };
-  return { payload, error: null };
+export const signSessionToken = (payload, privateData, secret) => {
+  const credentialVersion = getCredentialVersion(privateData, secret);
+  if (!credentialVersion) throw new Error('Invalid session credentials');
+  return signToken({ ...payload, username: privateData.admin.username, credentialVersion }, secret);
 };
 
 const getCookieOptions = (env = process.env) => {

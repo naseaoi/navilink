@@ -1,8 +1,8 @@
 import {
   buildClearAuthCookie,
-  createDefaultPrivateDataAsync,
-  getAuthPayload
+  createDefaultPrivateDataAsync
 } from './_shared/auth.js';
+import { getAuthPayload } from './_shared/session.js';
 import { loginAdmin } from './_shared/authService.js';
 import { createLoginRateLimiter } from './_shared/rateLimit.js';
 import { withTimestamp } from './_shared/data.js';
@@ -29,7 +29,7 @@ export default async function handler(request, response) {
   }
 
   if (request.method === 'GET') {
-    const payload = getAuthPayload(request, AUTH_SECRET);
+    const payload = await getAuthPayload(request, AUTH_SECRET);
     if (!payload) return response.status(401).json({ ok: false });
     return response.json({ ok: true, exp: payload.exp, mustChangePassword: !!payload.mustChangePassword });
   }
