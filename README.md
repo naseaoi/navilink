@@ -22,13 +22,13 @@
 |:---|:---|:---|
 | React 18 + TypeScript | Express 4 (Node.js) | Vite 6 |
 | Tailwind CSS 3 | JSON 文件存储 / WebDAV | Docker 多阶段构建 |
-| react-router-dom v6 | scrypt + HMAC-SHA256 鉴权 | TypeScript 类型检查 + GitHub Actions |
+| react-router-dom v7 | scrypt + HMAC-SHA256 鉴权 | TypeScript 类型检查 + GitHub Actions |
 
 ## 快速开始
 
 ### 环境要求
 
-- Node.js >= 18
+- Node.js 22.x（至少 22.13.0）或 24+；Docker 和 CI 统一使用 22.x
 - npm
 
 ### 本地开发
@@ -68,6 +68,8 @@ npm run test
 npm run typecheck
 npm run build
 npm run test:e2e
+npm audit --omit=dev
+npm audit
 ```
 
 ## 部署
@@ -156,6 +158,7 @@ pm2 start server.js --name navilink
 
 ## 安全说明
 
+- 生产依赖保持 Express 4；`qs` 由 npm `overrides` 约束在 6.16.0 或更高的兼容版本，更新父依赖时需复核此覆盖规则。
 - 会话绑定当前管理员凭据；通过密码接口、私有数据保存或批量保存修改账号/密码后，旧会话失效，当前浏览器获得新会话。升级前的旧会话需要重新登录。
 - 切换到具有不同管理员凭据的存储后，需要使用所选存储的账号重新登录。
 - 登录限流与并发上限按服务实例生效；多实例部署还应在反向代理或平台入口配置统一限流。
