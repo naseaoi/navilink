@@ -125,7 +125,7 @@ test.describe.serial('核心流程', () => {
   test('默认密码登录后必须修改密码', async ({ page }) => {
     await page.goto('/tat');
     await page.getByLabel('用户名').fill('admin');
-    await page.getByLabel('密码').fill('admin123');
+    await page.getByLabel('密码', { exact: true }).fill('admin123');
     await page.getByRole('button', { name: '登录', exact: true }).click();
     await expect(page.getByText('当前账号仍在使用默认密码', { exact: false })).toBeVisible();
     await page.getByLabel('重置密码').fill('e2e-password-123');
@@ -171,16 +171,16 @@ test.describe.serial('核心流程', () => {
 
     await page.goto('/tat');
     await page.getByLabel('用户名').fill('admin');
-    await page.getByLabel('密码').fill('e2e-password-123');
+    await page.getByLabel('密码', { exact: true }).fill('e2e-password-123');
     await page.getByRole('button', { name: '登录', exact: true }).click();
     await expect(page.getByRole('heading', { name: '卡片管理', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '数据存储', exact: true }).click();
     const previousFreshReads = freshPublicReads;
-    await page.getByRole('button', { name: '本地存储', exact: true }).click();
-    await page.getByRole('button', { name: 'WebDAV', exact: true }).click();
+    await page.getByRole('button', { name: '当前存储模式', exact: true }).click();
+    await page.getByRole('option', { name: 'WebDAV', exact: true }).click();
 
     await expect(page).toHaveTitle('WebDAV 旧版本');
-    expect(freshPublicReads).toBe(previousFreshReads + 1);
+    await expect.poll(() => freshPublicReads).toBe(previousFreshReads + 1);
   });
 
   test('新增卡片保存后重新加载仍存在', async ({ page }) => {
@@ -191,7 +191,7 @@ test.describe.serial('核心流程', () => {
     });
     await page.goto('/tat');
     await page.getByLabel('用户名').fill('admin');
-    await page.getByLabel('密码').fill('e2e-password-123');
+    await page.getByLabel('密码', { exact: true }).fill('e2e-password-123');
     await page.getByRole('button', { name: '登录', exact: true }).click();
     await expect(page.getByRole('heading', { name: '卡片管理', exact: true })).toBeVisible();
     expect(storageRequests).toHaveLength(0);

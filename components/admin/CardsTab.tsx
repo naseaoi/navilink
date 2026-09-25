@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Edit2, GripVertical, Plus, Sparkles, Trash2 
 import { Button, Input, Modal, Select } from '../UI';
 import { LinkCard, PublicData } from '../../types';
 import { CachedIcon } from '../public/CachedIcon';
+import { dataLimits, validateCardFields } from '../../services/validation';
 
 interface CardsTabProps {
   data: PublicData;
@@ -41,6 +42,9 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   const [dragOrder, setDragOrder] = useState<string[] | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [formError, setFormError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const fieldErrors: Partial<ReturnType<typeof validateCardFields>> = submitted ? validateCardFields(editingCard, data.categories.map((category) => category.id)) : {};
   const dragOrderRef = useRef<string[] | null>(null);
   const dragChangedRef = useRef(false);
 
@@ -134,11 +138,11 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
     setDraggedId(null);
   };
 
-  const openEdit = (card: LinkCard) => { setEditingCard(card); setIsModalOpen(true); };
+  const openEdit = (card: Partial<LinkCard>) => { setSubmitted(false); setFormError(''); setEditingCard(card); setIsModalOpen(true); };
 
   const addPreviewCards = () => {
     if (!data.categories.length) return;
-    const count = Math.min(Math.max(Math.trunc(previewCount) || 1, 1), MAX_PREVIEW_COUNT);
+    const count = Math.min(Math.max(Math.trunc(previewCount) || 1, 1), MAX_PREVIEW_COUNT, dataLimits.MAX_CARDS - data.cards.length);
     const stamp = Date.now();
     const maxOrder = Math.max(...data.cards.map((card) => card.order), -1);
     const nextCards = Array.from({ length: count }, (_, index) => ({
@@ -169,15 +173,20 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
   };
 
   const save = () => {
-    if (!editingCard.title || !editingCard.url || !isHttpUrl(editingCard.url)) return;
+    setSubmitted(true);
+    if (Object.values(validateCardFields(editingCard, data.categories.map((category) => category.id))).some(Boolean)) return;
+    const title = editingCard.title?.trim() || '';
+    const url = editingCard.url?.trim() || '';
+    setFormError('');
     const cards = [...data.cards];
     const idx = cards.findIndex(c => c.id === editingCard.id);
+    if (idx < 0 && cards.length >= dataLimits.MAX_CARDS) { setFormError(`卡片不能超过 ${dataLimits.MAX_CARDS} 张`); return; }
 
     if (idx >= 0) {
-      cards[idx] = editingCard as LinkCard;
+      cards[idx] = { ...editingCard, title, url, description: editingCard.description?.trim() || '', icon: editingCard.icon?.trim() || '' } as LinkCard;
     } else {
       const maxOrder = Math.max(...cards.map(c => c.order), -1);
-      cards.push({ ...editingCard, order: maxOrder + 1 } as LinkCard);
+      cards.push({ ...editingCard, title, url, description: editingCard.description?.trim() || '', icon: editingCard.icon?.trim() || '', order: maxOrder + 1 } as LinkCard);
     }
     onChange({ ...data, cards });
     setIsModalOpen(false);
@@ -209,7 +218,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
               onChange={(event) => setPreviewCount(Number(event.target.value))}
             />
           </div>
-          <Button onClick={addPreviewCards} variant="secondary" className="h-11 gap-2">
+          <Button onClick={addPreviewCards} disabled={!data.categories.length || data.cards.length >= dataLimits.MAX_CARDS} variant="secondary" className="h-11 gap-2">
             <Sparkles size={16} /> 新增预览
           </Button>
           <Button onClick={removePreviewCards} variant="secondary" disabled={!previewCards.length} className="h-11">
@@ -218,7 +227,7 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
           <Button onClick={removeInvalidCards} variant="danger" disabled={!invalidCards.length} className="h-11">
             清理无效
           </Button>
-          <Button onClick={()=>{setEditingCard({id:`card_${Date.now()}`, categoryId:data.categories[0]?.id||'', url:''}); setIsModalOpen(true);}} size="icon" className="rounded-control w-11 h-11 shrink-0" title="新增卡片"><Plus size={20}/></Button>
+          <Button onClick={()=>openEdit({id:`card_${crypto.randomUUID()}`, categoryId:data.categories[0]?.id||'', url:''})} disabled={!data.categories.length || data.cards.length >= dataLimits.MAX_CARDS} size="icon" className="rounded-control w-11 h-11 shrink-0" title="新增卡片"><Plus size={20}/></Button>
         </div>
       </div>
 
@@ -310,17 +319,20 @@ export const CardsTab: React.FC<CardsTabProps> = ({ data, onChange, confirm }) =
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} title={editingCard.id?.startsWith('card_') ? "编辑项目" : "新增项目"}>
+      <Modal isOpen={isModalOpen} onClose={()=>{ setFormError(''); setIsModalOpen(false); }} title={data.cards.some((card) => card.id === editingCard.id) ? "编辑项目" : "新增项目"}>
         <div className="space-y-4">
-          <Input label="显示名称" value={editingCard.title||''} onChange={e=>setEditingCard({...editingCard, title:e.target.value})} />
-          <Input label="目标 URL" value={editingCard.url||''} onChange={e=>setEditingCard({...editingCard, url:e.target.value})} />
+          {formError && <p role="alert" className="rounded-control border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">{formError}</p>}
+          <Input label="显示名称" error={fieldErrors.title} maxLength={dataLimits.MAX_TITLE_LENGTH} value={editingCard.title||''} onChange={e=>setEditingCard({...editingCard, title:e.target.value})} />
+          <Input label="目标 URL" error={fieldErrors.url} maxLength={dataLimits.MAX_URL_LENGTH} value={editingCard.url||''} onChange={e=>setEditingCard({...editingCard, url:e.target.value})} />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="图标 (可选)" placeholder="留空自动获取" value={editingCard.icon||''} onChange={e=>setEditingCard({...editingCard, icon:e.target.value})} />
+            <Input label="图标 (可选)" error={fieldErrors.icon} maxLength={dataLimits.MAX_URL_LENGTH} placeholder="留空自动获取" value={editingCard.icon||''} onChange={e=>setEditingCard({...editingCard, icon:e.target.value})} />
             <Select label="所属分类" value={editingCard.categoryId||''} onChange={v=>setEditingCard({...editingCard, categoryId:v})} options={categoryOptions} />
           </div>
+          {fieldErrors.categoryId && <p role="alert" className="text-xs text-red-600">{fieldErrors.categoryId}</p>}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-2">描述</label>
-            <textarea className="w-full rounded-control border border-subtle bg-surface p-3 text-sm text-1 placeholder:text-3 hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none" placeholder="简单描述一下..." rows={2} value={editingCard.description||''} onChange={e=>setEditingCard({...editingCard, description:e.target.value})} />
+            <textarea aria-label="描述" maxLength={dataLimits.MAX_DESCRIPTION_LENGTH} className="w-full rounded-control border border-subtle bg-surface p-3 text-sm text-1 placeholder:text-3 hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none" placeholder="简单描述一下..." rows={2} value={editingCard.description||''} onChange={e=>setEditingCard({...editingCard, description:e.target.value})} />
+            {fieldErrors.description && <p role="alert" className="text-xs text-red-600">{fieldErrors.description}</p>}
           </div>
           <div className="pt-4 flex gap-3"><Button variant="secondary" className="flex-1" onClick={()=>setIsModalOpen(false)}>取消</Button><Button className="flex-1" onClick={save}>保存</Button></div>
         </div>

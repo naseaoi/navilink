@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckSquare, Square } from 'lucide-react';
 import { Button, Input, PasswordInput } from '../UI';
+import { ApiError, apiErrorMessage, requestJson } from '../../services/apiClient';
 
 const loginCardClass =
   'w-full max-w-md rounded-3xl border border-[rgb(var(--border-subtle)/0.58)] bg-surface/95 p-8 shadow-popover dark:border-[rgb(var(--border-default)/0.36)] md:p-9';
@@ -14,23 +15,24 @@ export const AdminLogin: React.FC<{ onLogin: (mustChangePassword: boolean) => vo
   const isDisabled = !username.trim() || !password;
 
   const handleLogin = async () => {
+    if (isSubmitting || isDisabled) return;
     setError('');
     setIsSubmitting(true);
     try {
-      const options: RequestInit = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ username, password, remember })
-      };
-      let response = await fetch('/api/auth/login', options);
-      if (response.status === 404) response = await fetch('/api/auth', options);
-
-      if (!response.ok) throw new Error('Invalid credentials');
-      const { mustChangePassword } = await response.json();
+      let result: { mustChangePassword?: boolean };
+      try {
+        result = await requestJson('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, remember }), authenticated: false });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          result = await requestJson('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, remember }), authenticated: false });
+        } else throw error;
+      }
+      const { mustChangePassword } = result;
       onLogin(!!mustChangePassword);
-    } catch (e) {
-      setError('凭据无效');
+    } catch (error) {
+      setError(error instanceof ApiError && error.status === 401 ? '凭据无效'
+        : error instanceof ApiError && error.code === 'WRITE_TIMEOUT' ? '登录请求超时，请重试'
+          : apiErrorMessage(error, '登录失败'));
     } finally {
       setIsSubmitting(false);
     }

@@ -51,18 +51,11 @@ export const PublicView: React.FC<PublicViewProps> = ({ data, hasFetchedData, da
   }, [data.settings.title]);
 
   useEffect(() => {
-    if (isSearchOpen && searchInputRef.current) {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
-  }, [isSearchOpen]);
-
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setIsSearchOpen(true);
       }
-      if (e.key === 'Escape') closeSearch();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);

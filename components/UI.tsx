@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { X, Loader2, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -36,18 +37,26 @@ export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md'
 };
 
 // --- Input ---
-export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string }> = ({ label, className = '', ...props }) => (
+export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string | null }> = ({ label, error, className = '', ...props }) => {
+  const generatedId = useId();
+  const id = props.id || generatedId;
+  return (
   <div className="w-full">
-    {label && <label className="mb-1.5 block text-[12.5px] font-medium text-2">{label}</label>}
+    {label && <label htmlFor={id} className="mb-1.5 block text-[12.5px] font-medium text-2">{label}</label>}
     <input
+      id={id}
+      aria-invalid={!!error}
+      aria-describedby={error ? `${id}-error` : undefined}
       aria-label={props['aria-label'] || label}
       className={`flex h-11 w-full rounded-control border border-subtle bg-surface px-3.5 text-[13.5px] text-1
         transition-all duration-200 placeholder:text-3
         hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none ${className}`}
       {...props}
     />
+    {error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
   </div>
-);
+  );
+};
 
 // --- Modern Select ---
 interface SelectOption {
@@ -65,44 +74,53 @@ interface SelectProps {
 
 export const Select: React.FC<SelectProps> = ({ label, options, value, onChange, className = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const selectedOption = options.find(o => o.value === value);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listId = useId();
+  const selectedOption = options.find((option) => option.value === value);
+  const open = () => { setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value))); setIsOpen(true); };
+  const close = () => { setIsOpen(false); triggerRef.current?.focus(); };
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
+    if (!isOpen) return;
+    const handleOutside = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setIsOpen(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    containerRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]')[activeIndex]?.focus();
+  }, [activeIndex, isOpen]);
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div className={`relative ${className}`} ref={containerRef} onKeyDown={(event) => {
+      if (event.key === 'Escape' && isOpen) { event.preventDefault(); event.stopPropagation(); close(); }
+      else if (event.key === 'Tab') setIsOpen(false);
+      else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        if (!isOpen) { open(); return; }
+        setActiveIndex((index) => event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : Math.max(0, Math.min(options.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1))));
+      }
+    }}>
       {label && <label className="mb-1.5 block text-[12.5px] font-medium text-2">{label}</label>}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex h-11 w-full items-center justify-between rounded-control border border-subtle bg-surface px-3.5 text-[13.5px] text-1
-          transition-all duration-200 hover:border-default focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/15"
-      >
+      <button type="button" ref={triggerRef} aria-label={label} aria-haspopup="listbox" aria-expanded={isOpen} aria-controls={listId}
+        onClick={() => isOpen ? close() : open()}
+        className="flex h-11 w-full items-center justify-between rounded-control border border-subtle bg-surface px-3.5 text-[13.5px] text-1 transition-all duration-200 hover:border-default focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/15">
         <span className="truncate font-medium">{selectedOption?.label || '请选择'}</span>
         <ChevronDown size={15} className={`text-3 transition-transform duration-200 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-
       {isOpen && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-60 overflow-y-auto rounded-control
-          border border-subtle bg-surface-raised shadow-popover
-          animate-in fade-in slide-in-from-top-2 duration-200 min-w-full w-max p-1">
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => { onChange(opt.value); setIsOpen(false); }}
-              className={`flex w-full items-center px-3 py-2 text-[13px] font-medium rounded-md transition-colors whitespace-nowrap ${
-                value === opt.value ? 'bg-accent-soft text-accent' : 'text-2 hover:bg-subtle hover:text-1'
-              }`}
-            >
-              {opt.label}
+        <div id={listId} role="listbox" aria-label={label || '选项'} className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-60 overflow-y-auto rounded-control border border-subtle bg-surface-raised shadow-popover animate-in fade-in slide-in-from-top-2 duration-200 min-w-full w-max p-1">
+          {options.map((option, index) => (
+            <button key={option.value} type="button" role="option" aria-selected={value === option.value} tabIndex={index === activeIndex ? 0 : -1}
+              onFocus={() => setActiveIndex(index)}
+              onClick={() => { onChange(option.value); close(); }}
+              className={`flex w-full items-center px-3 py-2 text-[13px] font-medium rounded-md transition-colors whitespace-nowrap focus:bg-subtle focus:outline-none ${value === option.value ? 'bg-accent-soft text-accent' : 'text-2 hover:bg-subtle hover:text-1'}`}>
+              {option.label}
             </button>
           ))}
         </div>
@@ -113,6 +131,8 @@ export const Select: React.FC<SelectProps> = ({ label, options, value, onChange,
 
 // --- Modal ---
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
+  const dialogRef = useDialogFocus(isOpen, onClose);
+  const titleId = useId();
   if (!isOpen) return null;
   return createPortal((
     <div
@@ -120,13 +140,18 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className="w-full max-w-md bg-surface-raised rounded-modal shadow-popover overflow-hidden
           animate-in zoom-in-95 fade-in duration-200 border border-subtle"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-subtle">
-          <h3 className="text-[15px] font-semibold tracking-tight-display text-1">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-pill flex items-center justify-center text-3 hover:text-1 hover:bg-subtle transition-colors">
+          <h3 id={titleId} className="text-[15px] font-semibold tracking-tight-display text-1">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="关闭" className="w-8 h-8 rounded-pill flex items-center justify-center text-3 hover:text-1 hover:bg-subtle transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -146,6 +171,8 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string }> =
 );
 
 export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; message: string; variant?: 'danger' | 'primary'; closeOnConfirm?: boolean }> = ({ isOpen, onClose, onConfirm, title, message, variant = 'primary', closeOnConfirm = true }) => {
+  const dialogRef = useDialogFocus(isOpen, onClose);
+  const titleId = useId();
   if (!isOpen) return null;
   return createPortal((
     <div
@@ -153,11 +180,16 @@ export const ConfirmModal: React.FC<{ isOpen: boolean; onClose: () => void; onCo
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className="w-full max-w-sm bg-surface-raised rounded-modal shadow-popover p-7
           animate-in zoom-in-95 fade-in duration-200 border border-subtle text-center"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-[15.5px] font-semibold tracking-tight-display text-1 mb-2">{title}</h3>
+        <h3 id={titleId} className="text-[15.5px] font-semibold tracking-tight-display text-1 mb-2">{title}</h3>
         <p className="text-2 text-[13px] mb-6 leading-relaxed">{message}</p>
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={onClose}>取消</Button>
@@ -205,7 +237,7 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
             hover:border-default focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none ${className}`}
           {...props}
         />
-        <button type="button" onClick={() => setShow(!show)} className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-3 hover:text-1 hover:bg-subtle transition-colors">
+        <button type="button" aria-label={show ? "隐藏密码" : "显示密码"} onClick={() => setShow(!show)} className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-3 hover:text-1 hover:bg-subtle transition-colors">
           {show ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>

@@ -16,13 +16,14 @@ import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import { useStorageStatus } from '../hooks/useStorageStatus';
 import { useToasts } from '../hooks/useToasts';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import { apiErrorMessage } from '../services/apiClient';
 
 interface AdminDashboardProps {
   publicData: PublicData;
   privateData: PrivateData;
   mustChangePassword: boolean;
   onPasswordPolicyResolved: () => void;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
   onUpdatePublic: (d: PublicData) => void;
   onUpdatePrivate: (d: PrivateData) => void;
 }
@@ -71,6 +72,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
   });
 
   const hasShownPolicyToast = useRef(false);
+  const logout = async () => {
+    try {
+      await onLogout();
+    } catch (error) {
+      showToast(apiErrorMessage(error, '退出登录失败'), 'error');
+    }
+  };
   useEffect(() => {
     if (!mustChangePassword) {
       hasShownPolicyToast.current = false;
@@ -133,7 +141,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
         await refreshStorageStatus();
         return;
       }
-      showToast('保存失败', 'error');
+      showToast(apiErrorMessage(error, '保存失败'), 'error');
     } finally { setIsSaving(false); }
   };
 
@@ -156,7 +164,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
           mustChangePassword={mustChangePassword}
           onTabChange={setActiveTab}
           onGoHome={() => navigate('/')}
-          onLogout={() => leaveGuard.requestLeave(onLogout)}
+          onLogout={() => leaveGuard.requestLeave(logout)}
         />
       </aside>
 
@@ -171,7 +179,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ publicData, priv
                mustChangePassword={mustChangePassword}
                onTabChange={setActiveTab}
                onGoHome={() => navigate('/')}
-               onLogout={() => leaveGuard.requestLeave(onLogout)}
+               onLogout={() => leaveGuard.requestLeave(logout)}
                onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
              />
           </aside>

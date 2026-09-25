@@ -11,6 +11,7 @@ const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天
 const MAX_ENTRIES = 500;
 const MAX_MEMORY_ENTRIES = 500;
 const TOUCH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const MAX_FETCH_CONCURRENCY = 8;
 
 interface MemoryIcon {
   src: string;
@@ -19,6 +20,20 @@ interface MemoryIcon {
 
 const memoryCache = new Map<string, MemoryIcon>();
 const inFlight = new Map<string, Promise<string>>();
+let activeFetches = 0;
+const fetchQueue: Array<() => void> = [];
+
+const runFetch = async <T>(operation: () => Promise<T>): Promise<T> => {
+  if (activeFetches >= MAX_FETCH_CONCURRENCY) await new Promise<void>((resolve) => fetchQueue.push(resolve));
+  else activeFetches += 1;
+  try {
+    return await operation();
+  } finally {
+    const next = fetchQueue.shift();
+    if (next) next();
+    else activeFetches -= 1;
+  }
+};
 
 interface IconRecord {
   url: string;          // 主键
@@ -125,7 +140,13 @@ const PROXY_PATH = '/api/icon-proxy?url=';
 
 const fetchAsBlob = async (url: string): Promise<{ blob: Blob; contentType: string }> => {
   const proxied = `${PROXY_PATH}${encodeURIComponent(url)}`;
-  const resp = await fetch(proxied, { credentials: 'omit' });
+  let resp = await fetch(proxied, { credentials: 'omit', signal: AbortSignal.timeout(15_000) });
+  if ([429, 503].includes(resp.status)) {
+    const delay = Math.min(2_000, Math.max(500, Number(resp.headers.get('retry-after') || 1) * 1000));
+    await resp.body?.cancel();
+    await new Promise((resolve) => setTimeout(resolve, Number.isFinite(delay) ? delay : 1000));
+    resp = await fetch(proxied, { credentials: 'omit', signal: AbortSignal.timeout(15_000) });
+  }
   if (!resp.ok) throw new Error(`fetch ${url} -> ${resp.status}`);
   const blob = await resp.blob();
   // 体积异常小通常表示拉取失败/上游空响应,丢弃避免污染缓存
@@ -171,7 +192,7 @@ const loadIconSrc = async (url: string, ttlMs: number): Promise<string> => {
     // 使用代理继续加载
   }
 
-  const { blob, contentType } = await fetchAsBlob(url);
+  const { blob, contentType } = await runFetch(() => fetchAsBlob(url));
   const now = Date.now();
   const record: IconRecord = {
     url,

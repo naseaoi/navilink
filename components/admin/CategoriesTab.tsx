@@ -3,6 +3,7 @@ import { Check, Edit2, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '../UI';
 import { Category, LinkCard, PublicData } from '../../types';
 import { CATEGORY_ICON_OPTIONS, getCategoryIcon, getCategoryIconValue } from '../public/categoryIcons';
+import { dataLimits } from '../../services/validation';
 
 interface CategoriesTabProps {
   data: PublicData;
@@ -15,6 +16,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
   const [tmpName, setTmpName] = useState('');
   const [tmpIcon, setTmpIcon] = useState(CATEGORY_ICON_OPTIONS[0].value);
   const [activeIconPickerId, setActiveIconPickerId] = useState<string | null>(null);
+  const [error, setError] = useState('');
   const sortedCategories = useMemo(
     () => [...data.categories].sort((a, b) => a.order - b.order),
     [data.categories]
@@ -30,9 +32,11 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
   }, []);
 
   const addCategory = () => {
+    if (data.categories.length >= dataLimits.MAX_CATEGORIES) return;
+    setError('');
     const icon = getCategoryIconValue(data.categories.length);
     const newCategory: Category = {
-      id: `cat_${Date.now()}`,
+      id: `cat_${crypto.randomUUID()}`,
       name: '新分类',
       icon,
       order: data.categories.length,
@@ -44,6 +48,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
   };
 
   const handleEdit = (category: Category) => {
+    setError('');
     setEditId(category.id);
     setTmpName(category.name);
     setTmpIcon(category.icon || getCategoryIconValue(sortedCategories.findIndex((item) => item.id === category.id)));
@@ -51,7 +56,10 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
   };
 
   const handleSave = (id: string) => {
-    const updated = data.categories.map((c: Category) => c.id === id ? { ...c, name: tmpName, icon: tmpIcon } : c);
+    if (!tmpName.trim()) { setError('分类名称不能为空'); return; }
+    if (tmpName.trim().length > dataLimits.MAX_TITLE_LENGTH) { setError(`分类名称不能超过 ${dataLimits.MAX_TITLE_LENGTH} 个字符`); return; }
+    setError('');
+    const updated = data.categories.map((c: Category) => c.id === id ? { ...c, name: tmpName.trim(), icon: tmpIcon } : c);
     onChange({ ...data, categories: updated });
     setEditId(null);
     setActiveIconPickerId(null);
@@ -74,8 +82,9 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <span className="text-xs font-bold text-3 uppercase tracking-widest">分类列表</span>
-        <Button variant="secondary" size="sm" onClick={addCategory}><Plus size={16}/> 新增</Button>
+        <Button variant="secondary" size="sm" disabled={data.categories.length >= dataLimits.MAX_CATEGORIES} onClick={addCategory}><Plus size={16}/> 新增</Button>
       </div>
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {sortedCategories.map((c: Category, index) => {
           const isEditing = editId === c.id;
@@ -105,6 +114,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({ data, onChange, co
               <input
                 autoFocus
                 value={tmpName}
+                maxLength={dataLimits.MAX_TITLE_LENGTH}
                 onChange={e => setTmpName(e.target.value)}
                 onKeyDown={e=>e.key==='Enter' && handleSave(c.id)}
                 className="h-9 min-w-0 flex-1 rounded-control border border-subtle bg-surface px-3 text-[13.5px] font-semibold text-1 transition-all duration-200 placeholder:text-3 hover:border-default focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"

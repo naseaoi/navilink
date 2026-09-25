@@ -96,8 +96,8 @@ test('切换到不同凭据的存储后回到登录页', async ({ page }) => {
     switched ? route.fulfill({ status: 401, json: { error: 'Unauthorized' } }) : route.fallback()
   ));
   await page.getByRole('button', { name: '数据存储', exact: true }).click();
-  await page.getByRole('button', { name: '本地存储', exact: true }).click();
-  await page.getByRole('button', { name: 'WebDAV', exact: true }).click();
+  await page.getByRole('button', { name: '当前存储模式', exact: true }).click();
+  await page.getByRole('option', { name: 'WebDAV', exact: true }).click();
   await expect(page.getByRole('heading', { name: '后台登录' })).toBeVisible();
   expect(switched).toBe(true);
 });

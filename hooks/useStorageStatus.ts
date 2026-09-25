@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PrivateData, PublicData } from '../types';
 import { webdav } from '../services/webdavService';
+import { apiErrorMessage } from '../services/apiClient';
 
 type StorageMode = 'local' | 'webdav';
 type SyncDirection = 'none' | 'localToWebdav' | 'webdavToLocal';
@@ -50,7 +51,7 @@ export const useStorageStatus = ({
       const status = await webdav.getStorageStatus();
       setStorageStatus(status);
     } catch (error) {
-      showToast('获取存储状态失败', 'error');
+      showToast(apiErrorMessage(error, '获取存储状态失败'), 'error');
     }
   }, [enabled, showToast]);
 
@@ -66,7 +67,7 @@ export const useStorageStatus = ({
         setStorageAvailable(info.available);
         setStorageStatus(status);
       } catch (error) {
-        showToast('获取存储信息失败', 'error');
+        showToast(apiErrorMessage(error, '获取存储信息失败'), 'error');
       }
     };
     loadStorage();
@@ -82,7 +83,7 @@ export const useStorageStatus = ({
         await Promise.all([refreshRemoteData(), refreshStorageStatus()]);
         showToast('存储模式已切换', 'success');
       } catch (error) {
-        showToast('切换存储模式失败', 'error');
+        showToast(apiErrorMessage(error, '切换存储模式失败'), 'error');
       } finally {
         setStorageLoading(false);
       }
@@ -109,7 +110,7 @@ export const useStorageStatus = ({
           await Promise.all([refreshRemoteData(), refreshStorageStatus()]);
           showToast('数据同步完成', 'success');
         } catch (error) {
-          showToast('数据同步失败', 'error');
+          showToast(apiErrorMessage(error, '数据同步失败'), 'error');
         } finally {
           setSyncing('none');
         }

@@ -2,11 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { getCachedIconSrc, releaseCachedIconSrc } from '../../services/iconCache';
 import { observeVisibility } from '../../services/visibilityObserver';
 
-/**
- * 统一的卡片图标组件
- * 渲染优先级:IndexedDB 缓存 → 远程拉取并缓存 → Google favicon → 内置 SVG
- * 跨域图标若 fetch 失败,会跳过缓存直接走降级链
- */
+// 配置图标和自动 favicon 共用代理缓存，代理失败后尝试源站直连。
 
 const FALLBACK_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="#E7E5E4"/><rect x="16" y="18" width="32" height="28" rx="6" stroke="#78716C" stroke-width="3"/><circle cx="26" cy="28" r="3" fill="#78716C"/><path d="M20 42l9-9 6 6 5-5 8 8" stroke="#78716C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -31,12 +27,15 @@ interface CachedIconProps {
 }
 
 export const CachedIcon: React.FC<CachedIconProps> = ({ icon, siteUrl, alt, className }) => {
-  const normalizedIcon = icon?.trim() || '';
+  const favicon = buildFaviconFallback(siteUrl);
+  const [useFavicon, setUseFavicon] = useState(false);
+  const normalizedIcon = (useFavicon ? favicon : icon?.trim() || favicon) || '';
   const isInlineIcon = /^(data:|blob:)/i.test(normalizedIcon);
   const [src, setSrc] = useState<string>(() => (isInlineIcon ? normalizedIcon : FALLBACK_ICON));
-  const [fallbackStage, setFallbackStage] = useState<'origin' | 'favicon' | 'svg'>('origin');
   const [isVisible, setIsVisible] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => { setUseFavicon(false); }, [icon, siteUrl]);
 
   useEffect(() => {
     setIsVisible(false);
@@ -51,16 +50,13 @@ export const CachedIcon: React.FC<CachedIconProps> = ({ icon, siteUrl, alt, clas
     let acquired = false;
     if (!normalizedIcon) {
       setSrc(FALLBACK_ICON);
-      setFallbackStage('svg');
       return;
     }
     if (isInlineIcon) {
       setSrc(normalizedIcon);
-      setFallbackStage('origin');
       return;
     }
     setSrc(FALLBACK_ICON);
-    setFallbackStage('origin');
     if (!isVisible) return;
 
     getCachedIconSrc(normalizedIcon)
@@ -83,21 +79,8 @@ export const CachedIcon: React.FC<CachedIconProps> = ({ icon, siteUrl, alt, clas
   }, [isInlineIcon, isVisible, normalizedIcon]);
 
   const handleError = () => {
-    if (fallbackStage === 'origin') {
-      const favicon = buildFaviconFallback(siteUrl);
-      if (favicon) {
-        setSrc(favicon);
-        setFallbackStage('favicon');
-        return;
-      }
-      setSrc(FALLBACK_ICON);
-      setFallbackStage('svg');
-      return;
-    }
-    if (fallbackStage === 'favicon') {
-      setSrc(FALLBACK_ICON);
-      setFallbackStage('svg');
-    }
+    if (favicon && normalizedIcon !== favicon) setUseFavicon(true);
+    else setSrc(FALLBACK_ICON);
   };
 
   return (
