@@ -13,7 +13,7 @@ import sync from '../api/storage/sync.js';
 import save from '../api/storage/save.js';
 
 it('checks current credentials on every Vercel gate and renews sessions on each credential-write path', async (context) => {
-  const env = { AUTH_SECRET: randomBytes(32).toString('hex'), WEBDAV_URL: 'https://dav.example.invalid', WEBDAV_USERNAME: 'review', WEBDAV_PASSWORD: randomBytes(16).toString('hex') };
+  const env = { AUTH_SECRET: randomBytes(32).toString('hex'), WEBDAV_URL: 'http://dav.example.invalid', WEBDAV_ALLOW_HTTP: 'true', WEBDAV_TIMEOUT_MS: '12000', WEBDAV_MAX_RESPONSE_BYTES: '8192', WEBDAV_USERNAME: 'review', WEBDAV_PASSWORD: randomBytes(16).toString('hex') };
   const previous = Object.fromEntries(Object.keys(env).map((key) => [key, process.env[key]]));
   Object.assign(process.env, env);
   context.after(() => Object.entries(previous).forEach(([key, value]) => {
@@ -24,6 +24,7 @@ it('checks current credentials on every Vercel gate and renews sessions on each 
     'public.json': { ...createDefaultPublicData(), _meta: { updatedAt: 1 } },
     'private.json': { admin: { username: 'admin', passwordHash: await hashPasswordAsync(randomBytes(16).toString('hex')) }, _meta: { updatedAt: 1 } }
   };
+  const reads = [];
   context.mock.method(globalThis, 'fetch', async (url, options) => {
     const fileName = new URL(url).pathname.split('/').at(-1);
     assert.ok(Object.hasOwn(files, fileName));
@@ -31,6 +32,7 @@ it('checks current credentials on every Vercel gate and renews sessions on each 
       files[fileName] = JSON.parse(options.body);
       return new Response(null, { status: 201, headers: { etag: '"written"' } });
     }
+    reads.push(fileName);
     return Response.json(files[fileName], { headers: { etag: '"current"' } });
   });
   const invoke = async (handler, method, cookie, body) => {
@@ -58,10 +60,12 @@ it('checks current credentials on every Vercel gate and renews sessions on each 
   assert.equal((await invoke(verify, 'GET', cookie)).statusCode, 401);
   cookie = privateSave.headers['Set-Cookie'].split(';')[0];
   assert.equal((await invoke(verify, 'GET', cookie)).statusCode, 200);
+  reads.length = 0;
   const batch = await invoke(save, 'POST', cookie, {
     publicData: files['public.json'], privateData: { ...files['private.json'], admin: { username: 'owner', passwordHash: randomBytes(16).toString('hex') } }
   });
   assert.equal(batch.statusCode, 200);
+  assert.deepEqual(reads, ['private.json', 'public.json']);
   assert.equal((await invoke(verify, 'GET', cookie)).statusCode, 401);
   assert.equal((await invoke(verify, 'GET', batch.headers['Set-Cookie'].split(';')[0])).statusCode, 200);
 });

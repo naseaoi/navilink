@@ -1,0 +1,31 @@
+{
+  "MAX_CATEGORIES": 100,
+  "MAX_CARDS": 1000,
+  "MAX_ID_LENGTH": 80,
+  "MAX_TITLE_LENGTH": 80,
+  "MAX_DESCRIPTION_LENGTH": 240,
+  "MAX_URL_LENGTH": 1000,
+  "MAX_FOOTER_LENGTH": 240,
+  "MAX_ICON_KEY_LENGTH": 80,
+  "MAX_USERNAME_LENGTH": 64,
+  "MIN_PASSWORD_LENGTH": 8,
+  "MAX_PASSWORD_LENGTH": 128,
+  "MAX_ABS_ORDER": 1000000,
+  "CATEGORY_ICON_KEYS": [
+    "book-open",
+    "code-2",
+    "star",
+    "compass",
+    "layers",
+    "globe",
+    "wrench",
+    "briefcase-business",
+    "graduation-cap",
+    "image",
+    "lightbulb",
+    "music",
+    "palette",
+    "rocket",
+    "shopping-bag"
+  ]
+}

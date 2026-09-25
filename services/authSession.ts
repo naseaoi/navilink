@@ -1,4 +1,5 @@
-export const AUTH_SESSION_EXPIRED_EVENT = 'navilink:session-expired';
+import { ApiError, requestJson } from './apiClient';
+export { AUTH_SESSION_EXPIRED_EVENT } from './apiClient';
 
 export interface AuthSession {
   authenticated: boolean;
@@ -6,29 +7,27 @@ export interface AuthSession {
   mustChangePassword: boolean;
 }
 
-const requestSession = async (url: string) => fetch(url, {
-  method: 'GET',
-  credentials: 'same-origin'
-});
-
 export const verifyAuthSession = async (): Promise<AuthSession> => {
-  let response = await requestSession('/api/auth/verify');
-  if (response.status === 404) response = await requestSession('/api/auth');
-  if (response.status === 401) return { authenticated: false, mustChangePassword: false };
-  if (!response.ok) throw new Error('Failed to verify auth session');
-  const payload: { exp?: number; mustChangePassword?: boolean } = await response.json();
-  return {
-    authenticated: true,
-    exp: payload.exp,
-    mustChangePassword: !!payload.mustChangePassword
-  };
+  try {
+    let payload: { exp?: number; mustChangePassword?: boolean };
+    try {
+      payload = await requestJson('/api/auth/verify', { authenticated: false });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 404) throw error;
+      payload = await requestJson('/api/auth', { authenticated: false });
+    }
+    return { authenticated: true, exp: payload.exp, mustChangePassword: !!payload.mustChangePassword };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return { authenticated: false, mustChangePassword: false };
+    throw error;
+  }
 };
 
 export const logoutAuthSession = async () => {
   try {
-    const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-    if (!response.ok) throw new Error('Logout endpoint unavailable');
-  } catch {
-    await fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' });
+    await requestJson('/api/auth/logout', { method: 'POST' });
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    await requestJson('/api/auth', { method: 'DELETE' });
   }
 };

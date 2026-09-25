@@ -74,6 +74,6 @@ export default async function handler(request, response) {
       return response.status(400).json({ error: error.message });
     }
     console.error('[WebDAV Proxy] Exception:', error);
-    return response.status(500).json({ error: 'Server proxy error', message: error.message });
+    return response.status(500).json({ error: 'Server proxy error' });
   }
 }

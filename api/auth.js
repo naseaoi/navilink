@@ -22,7 +22,7 @@ const sendAuthResult = (response, result) => {
 };
 
 export default async function handler(request, response) {
-  const { WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH, AUTH_SECRET } = process.env;
+  const { AUTH_SECRET } = process.env;
   if (!AUTH_SECRET) return response.status(500).json({ error: 'AUTH_SECRET is missing.' });
   if (!hasWebDavConfig()) {
     return response.status(500).json({ error: 'WebDAV environment variables are missing on Vercel.' });
@@ -44,7 +44,7 @@ export default async function handler(request, response) {
   }
 
   try {
-    const env = getWebDavEnv({ WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD, WEBDAV_PATH });
+    const env = getWebDavEnv();
     const result = await loginAdmin({
       request,
       body: request.body,
@@ -62,6 +62,6 @@ export default async function handler(request, response) {
     return sendAuthResult(response, result);
   } catch (error) {
     console.error('[Auth] Exception:', error);
-    return response.status(500).json({ error: 'Auth Error', message: error.message });
+    return response.status(500).json({ error: 'Auth Error' });
   }
 }

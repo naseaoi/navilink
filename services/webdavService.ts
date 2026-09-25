@@ -1,6 +1,6 @@
 import { PublicData, PrivateData } from '../types';
 import { parsePublicData, readPublicDataCache, writePublicDataCache } from './publicDataCache';
-import { AUTH_SESSION_EXPIRED_EVENT } from './authSession';
+import { requestJson } from './apiClient';
 
 const PUBLIC_CACHE_KEY = 'navilink_public';
 
@@ -57,150 +57,59 @@ class WebDavService {
   }
 
   async getStorageMode(): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
-    const response = await fetch('/api/storage/mode', {
-      method: 'GET',
-      credentials: 'same-origin'
-    });
-    if (!response.ok) throw new Error('Failed to load storage mode');
-    return response.json();
+    return requestJson('/api/storage/mode');
   }
 
   async setStorageMode(mode: 'local' | 'webdav'): Promise<{ mode: 'local' | 'webdav'; available: { local: boolean; webdav: boolean } }> {
-    const response = await fetch('/api/storage/mode', {
-      method: 'PUT',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ mode })
-    });
-    if (!response.ok) throw new Error('Failed to update storage mode');
-    return response.json();
+    return requestJson('/api/storage/mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
   }
 
   async syncStorage(from: 'local' | 'webdav', to: 'local' | 'webdav'): Promise<void> {
-    const response = await fetch('/api/storage/sync', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ from, to })
-    });
-    if (!response.ok) throw new Error('Failed to sync storage');
+    await requestJson('/api/storage/sync', { method: 'POST', timeoutMs: 120_000, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to }) });
   }
 
   async getStorageStatus(): Promise<{ local: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; webdav: { publicUpdatedAt?: number | null; privateUpdatedAt?: number | null }; available: { local: boolean; webdav: boolean } }> {
-    const response = await fetch('/api/storage/status', {
-      method: 'GET',
-      credentials: 'same-origin'
-    });
-    if (!response.ok) throw new Error('Failed to load storage status');
-    return response.json();
+    return requestJson('/api/storage/status');
   }
 
   async fetchPublicData({ forceRefresh = false }: { forceRefresh?: boolean } = {}): Promise<PublicData> {
     const cached = this.getCachedPublicData();
     try {
-      const endpoint = forceRefresh
-        ? '/api/webdav?file=public.json&fresh=1'
-        : '/api/webdav?file=public.json';
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        credentials: 'same-origin',
-        cache: forceRefresh ? 'no-store' : 'default'
-      });
-
-      if (!response.ok) throw new Error(`Public data request failed: ${response.status}`);
-      const data = parsePublicData(await response.json());
-      const cachedVersion = cached?._meta?.updatedAt ?? 0;
-      const remoteVersion = data._meta?.updatedAt ?? 0;
-      if (!forceRefresh && cached && cachedVersion > remoteVersion) {
-        return this.fetchPublicData({ forceRefresh: true });
-      }
+      const endpoint = forceRefresh ? '/api/webdav?file=public.json&fresh=1' : '/api/webdav?file=public.json';
+      const data = parsePublicData(await requestJson(endpoint, { authenticated: false, cache: forceRefresh ? 'no-store' : 'default' }));
+      if (!forceRefresh && cached && (cached._meta?.updatedAt ?? 0) > (data._meta?.updatedAt ?? 0)) return this.fetchPublicData({ forceRefresh: true });
       this.cachePublicData(data);
       this.publicDataSource = 'api';
       return data;
     } catch {
-      if (cached) {
-        this.publicDataSource = 'localStorage';
-        return cached;
-      }
-      this.publicDataSource = 'default';
-      return DEFAULT_PUBLIC_DATA;
+      this.publicDataSource = cached ? 'localStorage' : 'default';
+      return cached || DEFAULT_PUBLIC_DATA;
     }
   }
 
   async savePublicData(data: PublicData): Promise<void> {
-    const response = await fetch('/api/webdav?file=public.json', {
-      method: 'PUT',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error('Failed to save via API');
+    await requestJson('/api/webdav?file=public.json', { method: 'PUT', timeoutMs: 120_000, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     this.cachePublicData(data);
   }
 
   async fetchPrivateData(): Promise<PrivateData> {
-    const response = await fetch('/api/webdav?file=private.json', {
-      method: 'GET',
-      credentials: 'same-origin'
-    });
-
-    if (response.status === 401) window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
-    if (!response.ok) throw new Error('Failed to load private data');
-
-    return await response.json();
+    return requestJson('/api/webdav?file=private.json');
   }
 
   async savePrivateData(data: PrivateData): Promise<void> {
-    const response = await fetch('/api/webdav?file=private.json', {
-      method: 'PUT',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error('Failed to save private data');
+    await requestJson('/api/webdav?file=private.json', { method: 'PUT', timeoutMs: 120_000, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   }
 
   async changePassword(username: string, password: string): Promise<PrivateData> {
-    const response = await fetch('/api/auth/password', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ username, password })
-    });
-    if (!response.ok) throw new Error('Failed to change password');
-    const result: { privateData: PrivateData } = await response.json();
+    const result = await requestJson<{ privateData: PrivateData }>('/api/auth/password', { method: 'POST', timeoutMs: 120_000, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
     return result.privateData;
   }
 
   async saveAllData(publicData: PublicData, privateData: PrivateData): Promise<{ publicData: PublicData; privateData: PrivateData }> {
-    const response = await fetch('/api/storage/save', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        publicData,
-        privateData,
-        expected: {
-          publicUpdatedAt: publicData._meta?.updatedAt ?? null,
-          privateUpdatedAt: privateData._meta?.updatedAt ?? null
-        }
-      })
+    const result = await requestJson<{ publicData: PublicData; privateData: PrivateData }>('/api/storage/save', {
+      method: 'POST', timeoutMs: 120_000, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicData, privateData, expected: { publicUpdatedAt: publicData._meta?.updatedAt ?? null, privateUpdatedAt: privateData._meta?.updatedAt ?? null } })
     });
-    if (response.status === 409) throw new Error('DATA_CONFLICT');
-    if (!response.ok) throw new Error('Failed to save data');
-    const result: { publicData: PublicData; privateData: PrivateData } = await response.json();
     this.cachePublicData(result.publicData);
     return result;
   }

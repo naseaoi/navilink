@@ -12,7 +12,10 @@ export const getWebDavEnv = (env = process.env) => ({
   WEBDAV_URL: env.WEBDAV_URL,
   WEBDAV_USERNAME: env.WEBDAV_USERNAME,
   WEBDAV_PASSWORD: env.WEBDAV_PASSWORD,
-  WEBDAV_PATH: env.WEBDAV_PATH
+  WEBDAV_PATH: env.WEBDAV_PATH,
+  WEBDAV_ALLOW_HTTP: env.WEBDAV_ALLOW_HTTP,
+  WEBDAV_TIMEOUT_MS: env.WEBDAV_TIMEOUT_MS,
+  WEBDAV_MAX_RESPONSE_BYTES: env.WEBDAV_MAX_RESPONSE_BYTES
 });
 
 export const buildWebDavUrls = (fileName, env = process.env) => {
